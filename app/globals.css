@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-inter);
+  --font-handwriting: var(--font-architects-daughter);
+
+  --color-esd-dark: #2C2F33;
+  --color-esd-darker: #23272A;
+  --color-safety-orange: #FF8C00;
+  --color-safety-orange-dark: #cc7000;
+  --color-paper-white: #F5F0E8;
+  --color-paper-shadow: rgba(0, 0, 0, 0.2);
+  --color-steel-grey: #99AAB5;
+  --color-steel-dark: #7289DA; /* Accent steel */
+}
+
+:root {
+  --background: #2C2F33;
+  --foreground: #ffffff;
+}
+
+body {
+  background-color: var(--color-esd-dark);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ESD Mat Dot Grid Overlay */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 10px 10px;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Paper Texture Utility */
+.paper-texture {
+  background-image: url("https://www.transparenttextures.com/patterns/felt.png"); /* Subtle paper texture */
+}
+
+/* Tactile Paper Card */
+.paper-card {
+  background-color: var(--color-paper-white);
+  color: #2C2F33;
+  box-shadow: 1px 2px 0px var(--color-paper-shadow);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  position: relative;
+}
+
+/* 3D Press Effect */
+.btn-press {
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.btn-press:active {
+  transform: translateY(2px);
+  box-shadow: none !important;
+}
+
+/* Vintage Gauge Animation */
+@keyframes loading-gauge {
+  0% { transform: scaleX(0); }
+  50% { transform: scaleX(0.7); }
+  100% { transform: scaleX(1); }
+}
+
+.gauge-fill {
+  animation: loading-gauge 2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  transform-origin: left;
+}
+
