@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { PageShell } from '@/components/layout/PageShell';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Calendar, Clock, Star, Video, MessageSquare, ShieldCheck } from 'lucide-react';
+import { Calendar, Clock, Star, Video, MessageSquare, ShieldCheck, X, CheckCircle2 } from 'lucide-react';
 
 const experts = [
   {
@@ -46,6 +47,16 @@ const experts = [
 
 export default function ConsultationPage() {
   const [selectedExpert, setSelectedExpert] = useState<number | null>(null);
+  const [bookingModal, setBookingModal] = useState<typeof experts[0] | null>(null);
+  const [bookingConfirmed, setBookingConfirmed] = useState(false);
+
+  const handleBooking = () => {
+    setBookingConfirmed(true);
+    setTimeout(() => {
+      setBookingModal(null);
+      setBookingConfirmed(false);
+    }, 2500);
+  };
 
   return (
     <PageShell>
@@ -111,7 +122,7 @@ export default function ConsultationPage() {
                             className="bg-safety-orange hover:bg-safety-orange/80"
                             onClick={(e) => {
                               e.stopPropagation();
-                              alert(`Booking request for ${expert.name} transmitted. Your session will appear in the dashboard once confirmed.`);
+                              setBookingModal(expert);
                             }}
                           >
                             Book Now
@@ -171,6 +182,104 @@ export default function ConsultationPage() {
           </div>
         </div>
       </div>
+
+      {/* Booking Confirmation Modal */}
+      <AnimatePresence>
+        {bookingModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => { if (!bookingConfirmed) { setBookingModal(null); } }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-zinc-900 border border-white/10 rounded-sm shadow-2xl max-w-md w-full overflow-hidden"
+            >
+              {!bookingConfirmed ? (
+                <>
+                  {/* Modal Header */}
+                  <div className="bg-safety-orange p-1">
+                    <div className="bg-zinc-900 p-6 flex items-center justify-between">
+                      <h3 className="text-xl font-black text-white uppercase tracking-tighter">Confirm Booking</h3>
+                      <button onClick={() => setBookingModal(null)} className="text-zinc-500 hover:text-white transition-colors">
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Modal Body */}
+                  <div className="p-6 space-y-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 bg-zinc-800 rounded-sm flex items-center justify-center border border-white/10">
+                        <User className="w-8 h-8 text-zinc-500" />
+                      </div>
+                      <div>
+                        <h4 className="text-lg font-black text-white uppercase tracking-tight">{bookingModal.name}</h4>
+                        <p className="text-xs text-zinc-500 font-bold uppercase">{bookingModal.title}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-3 bg-black/30 rounded-sm border border-white/5">
+                        <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest block mb-1">Rate</span>
+                        <span className="text-lg font-black text-safety-orange">{bookingModal.price}</span>
+                      </div>
+                      <div className="p-3 bg-black/30 rounded-sm border border-white/5">
+                        <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest block mb-1">Next Slot</span>
+                        <span className="text-sm font-bold text-white">{bookingModal.availability.replace('Next: ', '')}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {bookingModal.tags.map(tag => (
+                        <span key={tag} className="px-2 py-1 bg-zinc-800 text-[10px] font-bold text-zinc-400 rounded-sm border border-white/5">#{tag}</span>
+                      ))}
+                    </div>
+
+                    <p className="text-xs text-zinc-500 leading-relaxed border-t border-white/5 pt-4">
+                      By confirming, a booking request will be sent to <strong className="text-white">{bookingModal.name}</strong>. You will be notified once the session is confirmed. Payment is collected upon session completion.
+                    </p>
+                  </div>
+
+                  {/* Modal Actions */}
+                  <div className="p-6 pt-0 flex gap-4">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={() => setBookingModal(null)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      className="flex-1 bg-safety-orange hover:bg-safety-orange/80 shadow-[0_4px_0_0_#995400]"
+                      onClick={handleBooking}
+                    >
+                      Confirm Booking
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="p-12 flex flex-col items-center text-center">
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                  >
+                    <CheckCircle2 className="w-16 h-16 text-green-500 mb-6" />
+                  </motion.div>
+                  <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-2">Booking Submitted</h3>
+                  <p className="text-sm text-zinc-500">Your session request with <strong className="text-safety-orange">{bookingModal.name}</strong> has been transmitted. Check your dashboard for updates.</p>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </PageShell>
   );
 }

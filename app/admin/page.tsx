@@ -55,13 +55,22 @@ function AdminPanel() {
   React.useEffect(() => {
     const fetchData = async () => {
       try {
-        // Users
-        const userRes = await fetch('/api/users');
+        setLoadingUsers(true);
+        setLoadingInventory(true);
+        setLoadingOrders(true);
+        setLoadingApps(true);
+        setLoadingConsultations(true);
+
+        const [userRes, prodRes, appRes] = await Promise.all([
+          fetch('/api/users'),
+          fetch('/api/products'),
+          fetch('/api/applications')
+        ]);
+
         if (userRes.ok) setUsers(await userRes.json());
-        
-        // Products
-        const prodRes = await fetch('/api/products');
         if (prodRes.ok) setInventory(await prodRes.json());
+        if (appRes.ok) setApplications(await appRes.json());
+        
       } catch (e) {
         console.error("Failed to sync system registry", e);
       } finally {
@@ -79,21 +88,39 @@ function AdminPanel() {
   }, [status]);
 
   // Actions
-  const approveExpert = (id: string) => {
-    const app = applications.find(a => a.id === id);
-    if (!app) return;
-    setUsers(prev => [...prev, { 
-      id: Math.random().toString(), 
-      name: app.name, 
-      email: `${app.name.toLowerCase().replace(' ', '.')}@expert.xts`,
-      role: 'expert',
-      status: 'offline'
-    }]);
-    setApplications(prev => prev.filter(a => a.id !== id));
+  const approveExpert = async (id: string) => {
+    try {
+      const res = await fetch(`/api/applications/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'approved' })
+      });
+      
+      if (res.ok) {
+        setApplications(prev => prev.filter(a => a.id !== id));
+        // Refresh users to see new role
+        const userRes = await fetch('/api/users');
+        if (userRes.ok) setUsers(await userRes.json());
+      }
+    } catch (e) {
+       console.error("Failed to approve expert", e);
+    }
   };
 
-  const declineExpert = (id: string) => {
-    setApplications(prev => prev.filter(a => a.id !== id));
+  const declineExpert = async (id: string) => {
+    try {
+      const res = await fetch(`/api/applications/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'rejected' })
+      });
+      
+      if (res.ok) {
+        setApplications(prev => prev.filter(a => a.id !== id));
+      }
+    } catch (e) {
+       console.error("Failed to decline expert", e);
+    }
   };
 
   const toggleRole = async (userId: string, currentRole: string, roleToToggle: string) => {
@@ -275,11 +302,11 @@ function AdminPanel() {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="space-y-2">
                           <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">MSRP (PHP)</label>
-                          <Input required type="number" step="0.01" className="bg-zinc-900 border-zinc-800" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: parseFloat(e.target.value)})} />
+                          <Input required type="number" step="0.01" className="bg-zinc-900 border-zinc-800" value={newProduct.price || ''} onChange={e => setNewProduct({...newProduct, price: parseFloat(e.target.value) || 0})} />
                         </div>
                         <div className="space-y-2">
                           <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Initial Logic Stock</label>
-                          <Input required type="number" className="bg-zinc-900 border-zinc-800" value={newProduct.stock} onChange={e => setNewProduct({...newProduct, stock: parseInt(e.target.value)})} />
+                          <Input required type="number" className="bg-zinc-900 border-zinc-800" value={newProduct.stock || ''} onChange={e => setNewProduct({...newProduct, stock: parseInt(e.target.value) || 0})} />
                         </div>
                         <div className="space-y-2">
                           <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Status Tag</label>

@@ -6,8 +6,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { XTSLogo, ShopIcon, FabricationIcon, ConsultationIcon, CommunityIcon } from '@/components/icons';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
-import { Menu, X, ShoppingCart, LogOut, User as UserIcon, LayoutDashboard } from 'lucide-react';
+import { Menu, X, ShoppingCart, LogOut, User as UserIcon, LayoutDashboard, Loader2 } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
+import { useCart } from '@/lib/cart-context';
 
 const navLinks = [
   { name: 'Shop', href: '/shop', icon: ShopIcon },
@@ -21,6 +22,8 @@ export const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const { cartCount } = useCart();
 
   useEffect(() => {
     setMounted(true);
@@ -31,9 +34,13 @@ export const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Use a stable class for initial SSR and only apply scroll logic after mount
-  const navClasses = mounted && isScrolled 
-    ? "bg-esd-darker/90 backdrop-blur-md py-4 border-b border-white/10 shadow-xl" 
+  const handleSignOut = async () => {
+    setLoggingOut(true);
+    await signOut({ callbackUrl: '/' });
+  };
+
+  const navClasses = mounted && isScrolled
+    ? "bg-esd-darker/90 backdrop-blur-md py-4 border-b border-white/10 shadow-xl"
     : "bg-transparent py-6";
 
   return (
@@ -50,8 +57,8 @@ export const Navbar = () => {
         {/* Desktop Nav */}
         <div className="hidden lg:flex items-center gap-8">
           {navLinks.map((link) => (
-            <Link 
-              key={link.name} 
+            <Link
+              key={link.name}
               href={link.href}
               className="group flex items-center gap-2 text-zinc-400 hover:text-safety-orange transition-colors"
             >
@@ -65,9 +72,18 @@ export const Navbar = () => {
         <div className="flex items-center gap-4">
           <Link href="/cart" className="relative p-2 text-zinc-400 hover:text-white transition-colors">
             <ShoppingCart className="w-6 h-6" />
-            <span className="absolute top-0 right-0 bg-safety-orange text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full leading-none">0</span>
+            {cartCount > 0 && (
+              <motion.span
+                key={cartCount}
+                initial={{ scale: 0.5 }}
+                animate={{ scale: 1 }}
+                className="absolute top-0 right-0 bg-safety-orange text-white text-[10px] font-bold min-w-[16px] h-4 flex items-center justify-center rounded-full leading-none px-1"
+              >
+                {cartCount > 99 ? '99+' : cartCount}
+              </motion.span>
+            )}
           </Link>
-          
+
           <div className="hidden md:flex items-center gap-4">
             {session ? (
               <div className="flex items-center gap-4">
@@ -94,12 +110,17 @@ export const Navbar = () => {
                     <span className="text-xs font-bold text-white leading-none">{session.user?.name?.split(' ')[0]}</span>
                   </div>
                 </Link>
-                <button 
-                  onClick={() => signOut()}
-                  className="p-2 text-zinc-500 hover:text-red-500 transition-colors"
+                <button
+                  onClick={handleSignOut}
+                  disabled={loggingOut}
+                  className="p-2 text-zinc-500 hover:text-red-500 transition-colors disabled:opacity-50"
                   title="Sign Out"
                 >
-                  <LogOut className="w-4 h-4" />
+                  {loggingOut ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <LogOut className="w-4 h-4" />
+                  )}
                 </button>
               </div>
             ) : (
@@ -109,7 +130,7 @@ export const Navbar = () => {
             )}
           </div>
 
-          <button 
+          <button
             className="lg:hidden text-white"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
@@ -144,8 +165,8 @@ export const Navbar = () => {
                 </div>
               )}
               {navLinks.map((link) => (
-                <Link 
-                  key={link.name} 
+                <Link
+                  key={link.name}
                   href={link.href}
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center gap-4 text-xl font-black uppercase tracking-tighter text-white hover:text-safety-orange transition-colors"
@@ -154,10 +175,19 @@ export const Navbar = () => {
                   {link.name}
                 </Link>
               ))}
-              
+
+              <Link
+                href="/cart"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-4 text-xl font-black uppercase tracking-tighter text-white hover:text-safety-orange transition-colors"
+              >
+                <ShoppingCart className="w-6 h-6" />
+                Cart {cartCount > 0 && `(${cartCount})`}
+              </Link>
+
               {session && ((session.user as any)?.role?.includes('admin') || (session.user as any)?.role?.includes('expert')) && (
-                <Link 
-                  href="/admin" 
+                <Link
+                  href="/admin"
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
                     "flex items-center gap-4 text-xl font-black uppercase tracking-tighter transition-colors",
@@ -171,7 +201,20 @@ export const Navbar = () => {
 
               <hr className="border-white/10" />
               {session ? (
-                <Button className="w-full" variant="danger" onClick={() => signOut()}>Sign Out</Button>
+                <Button
+                  className="w-full flex items-center justify-center gap-2"
+                  variant="danger"
+                  onClick={handleSignOut}
+                  disabled={loggingOut}
+                >
+                  {loggingOut ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Signing Out...
+                    </>
+                  ) : (
+                    'Sign Out'
+                  )}
+                </Button>
               ) : (
                 <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
                   <Button className="w-full">Sign In</Button>

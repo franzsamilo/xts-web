@@ -46,10 +46,10 @@ export const Footer = () => {
               The ultimate workbench for engineers. High-quality parts, specialized fabrication, and an expert community to bring your projects to life.
             </p>
             <div className="flex gap-4">
-              {/* Social icons placeholders */}
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="w-10 h-10 rounded-sm bg-zinc-800 flex items-center justify-center text-zinc-400 hover:bg-safety-orange hover:text-white transition-colors cursor-pointer">
-                  {i}
+              {/* Social icons */}
+              {['X', 'GH', 'IN', 'YT'].map(label => (
+                <div key={label} className="w-10 h-10 rounded-sm bg-zinc-800 flex items-center justify-center text-zinc-400 hover:bg-safety-orange hover:text-white transition-colors cursor-pointer text-[10px] font-black">
+                  {label}
                 </div>
               ))}
             </div>
@@ -73,7 +73,7 @@ export const Footer = () => {
         
         <div className="pt-10 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-6">
           <p className="text-zinc-600 text-sm">
-            © {new Date().getFullYear()} XTS WEB. Designed for the Engineering Desk.
+            &copy; {new Date().getFullYear()} XTS WEB. Designed for the Engineering Desk.
           </p>
           <div className="flex gap-8 text-sm text-zinc-600">
             <Link href="/privacy" className="hover:text-zinc-400">Privacy Policy</Link>

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAllProducts, createProduct } from '@/lib/products';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 export async function GET() {
   const products = await getAllProducts();
@@ -8,9 +9,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await getServerSession();
-  
-  if (!session || (session.user as any)?.role !== 'admin') {
+  const session = await getServerSession(authOptions);
+
+  if (!session || !(session.user as any)?.role?.includes('admin')) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

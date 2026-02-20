@@ -7,11 +7,10 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { ShopIcon } from '@/components/icons';
-import { Box, Filter, Search, SlidersHorizontal } from 'lucide-react';
+import { Box, Search, Activity, Check } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
-
 import Link from 'next/link';
-import { Activity } from 'lucide-react';
+import { useCart } from '@/lib/cart-context';
 
 const categories = ['All', 'Robotics', 'Motion', 'Power', 'Hardware', 'Sensors', 'Electronics'];
 
@@ -20,6 +19,8 @@ export default function ShopPage() {
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+  const { addToCart } = useCart();
 
   React.useEffect(() => {
     const fetchProducts = async () => {
@@ -44,22 +45,42 @@ export default function ShopPage() {
     return matchesCategory && matchesSearch;
   });
 
+  const handleAddToCart = (product: any) => {
+    addToCart({
+      id: product.id,
+      name: product.name,
+      price: parseFloat(product.price),
+      category: product.category,
+      sku: product.sku,
+      tag: product.tag,
+    });
+    // Show brief "added" feedback
+    setAddedIds(prev => new Set(prev).add(product.id));
+    setTimeout(() => {
+      setAddedIds(prev => {
+        const next = new Set(prev);
+        next.delete(product.id);
+        return next;
+      });
+    }, 1500);
+  };
+
   return (
     <PageShell>
-      <div className="container mx-auto px-4 py-20">
+      <div className="container mx-auto px-6 py-20">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
-          <SectionHeading 
-            title="Hardware Shop" 
-            annotation="Quality Parts for Every Build" 
+          <SectionHeading
+            title="Hardware Shop"
+            annotation="Quality Parts for Every Build"
             dark={true}
             className="mb-0"
           />
-          
+
           <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
             <div className="relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-safety-orange transition-colors" />
-              <Input 
-                placeholder="Search inventory..." 
+              <Input
+                placeholder="Search inventory..."
                 className="pl-12 w-full md:w-64 bg-zinc-900 border-zinc-800"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -74,8 +95,8 @@ export default function ShopPage() {
               key={cat}
               onClick={() => setSelectedCategory(cat)}
               className={`px-6 py-2 rounded-full text-xs font-black uppercase tracking-tighter transition-all border ${
-                selectedCategory === cat 
-                ? 'bg-safety-orange border-safety-orange text-white' 
+                selectedCategory === cat
+                ? 'bg-safety-orange border-safety-orange text-white'
                 : 'bg-zinc-900 border-white/10 text-zinc-500 hover:border-zinc-500'
               }`}
             >
@@ -99,7 +120,7 @@ export default function ShopPage() {
                       </Badge>
                     </div>
                   </div>
-                  
+
                   <div className="flex-grow min-h-[120px]">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{p.category}</span>
@@ -111,8 +132,17 @@ export default function ShopPage() {
 
                 <div className="flex items-center justify-between pt-6 border-t border-black/5 mt-auto">
                   <span className="text-2xl font-black text-safety-orange">PHP {parseFloat(p.price).toFixed(2)}</span>
-                  <Button variant="primary" size="sm" className="px-4 min-w-0">
-                    <ShopIcon className="w-5 h-5 mr-2" /> Add
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className={`px-4 min-w-0 transition-all ${addedIds.has(p.id) ? 'bg-green-600 hover:bg-green-600' : ''}`}
+                    onClick={() => handleAddToCart(p)}
+                  >
+                    {addedIds.has(p.id) ? (
+                      <><Check className="w-4 h-4 mr-1" /> Added</>
+                    ) : (
+                      <><ShopIcon className="w-5 h-5 mr-2" /> Add</>
+                    )}
                   </Button>
                 </div>
               </Card>

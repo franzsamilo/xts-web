@@ -3,19 +3,21 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/layout/PageShell';
-import { SectionHeading } from '@/components/ui/SectionHeading';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { ShopIcon } from '@/components/icons';
-import { Box, ArrowLeft, ShieldCheck, Truck, RotateCcw, Activity } from 'lucide-react';
+import { Box, ArrowLeft, ShieldCheck, Truck, RotateCcw, Activity, Check } from 'lucide-react';
 import Link from 'next/link';
+import { useCart } from '@/lib/cart-context';
 
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [id, setId] = useState<string | null>(null);
   const router = useRouter();
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [added, setAdded] = useState(false);
+  const { addToCart } = useCart();
 
   useEffect(() => {
     params.then(p => setId(p.id));
@@ -40,10 +42,24 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     fetchProduct();
   }, [id]);
 
+  const handleAddToCart = () => {
+    if (!product) return;
+    addToCart({
+      id: product.id,
+      name: product.name,
+      price: parseFloat(product.price),
+      category: product.category,
+      sku: product.sku,
+      tag: product.tag,
+    });
+    setAdded(true);
+    setTimeout(() => setAdded(false), 2000);
+  };
+
   if (loading) {
     return (
       <PageShell>
-        <div className="container mx-auto px-4 py-32 flex justify-center">
+        <div className="container mx-auto px-6 py-32 flex justify-center">
           <Activity className="w-12 h-12 text-safety-orange animate-spin" />
         </div>
       </PageShell>
@@ -53,7 +69,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   if (!product) {
     return (
       <PageShell>
-        <div className="container mx-auto px-4 py-32 text-center">
+        <div className="container mx-auto px-6 py-32 text-center">
           <h2 className="text-4xl font-black text-white uppercase mb-4">Node Not Found</h2>
           <Button onClick={() => router.push('/shop')}>Back to Registry</Button>
         </div>
@@ -63,7 +79,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <PageShell>
-      <div className="container mx-auto px-4 py-20">
+      <div className="container mx-auto px-6 py-20">
         <Link href="/shop" className="flex items-center gap-2 text-zinc-500 hover:text-white mb-12 transition-colors group">
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           <span className="text-[10px] font-black uppercase tracking-widest">Back to Inventory</span>
@@ -122,8 +138,20 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             </div>
 
             <div className="mt-auto space-y-4">
-              <Button className="w-full h-16 text-lg uppercase font-black tracking-widest bg-safety-orange hover:bg-safety-orange/80 shadow-[0_6px_0_0_#c2410c] active:translate-y-[2px] active:shadow-[0_4px_0_0_#c2410c] transition-all">
-                <ShopIcon className="w-6 h-6 mr-3" /> Add to Acquisition Queue
+              <Button
+                className={`w-full h-16 text-lg uppercase font-black tracking-widest transition-all ${
+                  added
+                    ? 'bg-green-600 hover:bg-green-600 shadow-[0_6px_0_0_#166534]'
+                    : 'bg-safety-orange hover:bg-safety-orange/80 shadow-[0_6px_0_0_#c2410c]'
+                } active:translate-y-[2px] active:shadow-none`}
+                onClick={handleAddToCart}
+                disabled={product.stock <= 0}
+              >
+                {added ? (
+                  <><Check className="w-6 h-6 mr-3" /> Added to Queue</>
+                ) : (
+                  <><ShopIcon className="w-6 h-6 mr-3" /> Add to Acquisition Queue</>
+                )}
               </Button>
               <p className="text-[10px] text-center text-zinc-600 font-bold uppercase tracking-widest">
                 Technical review and NDA coverage optional at checkout

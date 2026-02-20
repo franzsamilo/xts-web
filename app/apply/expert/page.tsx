@@ -11,6 +11,34 @@ import { PenTool, Brain, Calendar, Award } from 'lucide-react';
 
 export default function ApplyExpertPage() {
   const [submitted, setSubmitted] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const [formData, setFormData] = React.useState({
+    name: '',
+    discipline: '',
+    expertise: ''
+  });
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          expertise: `${formData.discipline} - ${formData.expertise}`,
+          type: 'expert'
+        })
+      });
+      if (res.ok) {
+        setSubmitted(true);
+      }
+    } catch (e) {
+      console.error("Application failed", e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (submitted) {
     return (
@@ -50,11 +78,21 @@ export default function ApplyExpertPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest px-1">Full Legal Name</label>
-                <Input placeholder="Engineering Lead" className="bg-black/50 border-zinc-800 text-white" />
+                <Input 
+                  placeholder="Engineering Lead" 
+                  className="bg-black/50 border-zinc-800 text-white" 
+                  value={formData.name}
+                  onChange={e => setFormData({...formData, name: e.target.value})}
+                />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest px-1">Primary Discipline</label>
-                <Input placeholder="Mechatronics / Aerospace" className="bg-black/50 border-zinc-800 text-white" />
+                <Input 
+                  placeholder="Mechatronics / Aerospace" 
+                  className="bg-black/50 border-zinc-800 text-white" 
+                  value={formData.discipline}
+                  onChange={e => setFormData({...formData, discipline: e.target.value})}
+                />
               </div>
             </div>
             
@@ -63,6 +101,8 @@ export default function ApplyExpertPage() {
               <Textarea 
                 placeholder="List your professional background, degrees, and specific hardware expertise (e.g. ROS2, CNC, PLC)..." 
                 className="bg-black/50 border-zinc-800 text-white min-h-[150px]" 
+                value={formData.expertise}
+                onChange={e => setFormData({...formData, expertise: e.target.value})}
               />
             </div>
 
@@ -73,9 +113,10 @@ export default function ApplyExpertPage() {
               </div>
               <Button 
                 className="w-full md:w-auto px-12 h-14 text-lg bg-safety-orange hover:bg-safety-orange/80"
-                onClick={() => setSubmitted(true)}
+                onClick={handleSubmit}
+                disabled={loading}
               >
-                Apply to Consult
+                {loading ? 'Transmitting...' : 'Apply to Consult'}
               </Button>
             </div>
           </div>

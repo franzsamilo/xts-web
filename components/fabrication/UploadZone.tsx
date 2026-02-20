@@ -1,15 +1,53 @@
 "use client";
 
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { UploadIcon } from '@/components/icons';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
-import { FileText, X, CheckCircle2 } from 'lucide-react';
+import { FileText, X, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
+
+const ALLOWED_EXTENSIONS = ['.stl', '.dxf', '.zip', '.rar', '.gerber', '.gbr', '.gbl', '.gtl', '.gbs', '.gts', '.gbo', '.gto', '.drl', '.step', '.stp', '.iges', '.igs'];
+
+const isAllowedFile = (file: File): boolean => {
+  const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+  return ALLOWED_EXTENSIONS.includes(ext);
+};
 
 export const UploadZone = () => {
   const [dragActive, setDragActive] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' } | null>(null);
+
+  const showToast = (message: string, type: 'error' | 'success' = 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const processFiles = (incoming: File[]) => {
+    const valid: File[] = [];
+    const rejected: string[] = [];
+
+    incoming.forEach(f => {
+      if (isAllowedFile(f)) {
+        valid.push(f);
+      } else {
+        rejected.push(f.name);
+      }
+    });
+
+    if (rejected.length > 0) {
+      showToast(
+        `Invalid format: ${rejected.join(', ')}. Only STL, DXF, STEP, IGES, Gerber, and ZIP files are accepted.`,
+        'error'
+      );
+    }
+
+    if (valid.length > 0) {
+      setFiles(prev => [...prev, ...valid]);
+    }
+  };
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -26,19 +64,69 @@ export const UploadZone = () => {
     e.stopPropagation();
     setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const newFiles = Array.from(e.dataTransfer.files);
-      setFiles(prev => [...prev, ...newFiles]);
+      processFiles(Array.from(e.dataTransfer.files));
     }
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      processFiles(Array.from(e.target.files));
+    }
+    e.target.value = '';
   };
 
   const removeFile = (name: string) => {
     setFiles(prev => prev.filter(f => f.name !== name));
   };
 
+  const handleRequestQuote = async () => {
+    if (files.length === 0) return;
+
+    setSubmitting(true);
+
+    // Simulate API request — in production this would upload to storage + create a Firestore document
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    showToast(
+      `Quote request submitted for ${files.length} file${files.length > 1 ? 's' : ''}. Our engineering team will review within 2-4 hours.`,
+      'success'
+    );
+
+    setFiles([]);
+    setSubmitting(false);
+  };
+
   return (
-    <div className="w-full max-w-2xl mx-auto">
+    <div className="w-full max-w-2xl mx-auto relative">
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: -20, x: '-50%' }}
+            className={cn(
+              "fixed top-24 left-1/2 z-[100] px-6 py-4 rounded-sm shadow-2xl border flex items-center gap-3 max-w-lg",
+              toast.type === 'error'
+                ? "bg-red-950 border-red-500/50 text-red-200"
+                : "bg-green-950 border-green-500/50 text-green-200"
+            )}
+          >
+            {toast.type === 'error' ? (
+              <AlertTriangle className="w-5 h-5 shrink-0 text-red-500" />
+            ) : (
+              <CheckCircle2 className="w-5 h-5 shrink-0 text-green-500" />
+            )}
+            <p className="text-sm font-bold">{toast.message}</p>
+            <button onClick={() => setToast(null)} className="ml-2 text-white/50 hover:text-white">
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Metal 'In-Tray' Container */}
-      <div 
+      <div
         className={cn(
           "relative p-8 border-4 border-zinc-600 bg-zinc-800 shadow-[inset_0_4px_10px_rgba(0,0,0,0.5),0_10px_0_0_#3f3f46] rounded-sm transition-all",
           dragActive ? "border-safety-orange bg-zinc-700/50" : ""
@@ -59,26 +147,31 @@ export const UploadZone = () => {
             <UploadIcon className={cn("w-10 h-10 transition-colors", dragActive ? "text-safety-orange" : "text-zinc-500")} />
           </div>
           <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-2">FABRICATION IN-TRAY</h3>
-          <p className="text-zinc-500 font-handwriting text-lg mb-8">Drop STL, DXF, or Gerber files here</p>
-          
-          <input 
-            type="file" 
-            multiple 
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            onChange={(e) => e.target.files && setFiles(prev => [...prev, ...Array.from(e.target.files!)])}
-          />
-          
-          <Button variant="secondary" size="md">Select Files</Button>
+          <p className="text-zinc-500 font-handwriting text-lg mb-2">Drop STL, DXF, or Gerber files here</p>
+          <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-widest mb-8">
+            Accepted: .stl, .dxf, .step, .iges, .zip, .gerber
+          </p>
+
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              multiple
+              accept=".stl,.dxf,.zip,.rar,.gerber,.gbr,.gbl,.gtl,.gbs,.gts,.gbo,.gto,.drl,.step,.stp,.iges,.igs"
+              className="hidden"
+              onChange={handleFileInput}
+            />
+            <Button variant="secondary" size="md" className="pointer-events-none">Select Files</Button>
+          </label>
         </div>
 
         {/* File List */}
         {files.length > 0 && (
           <div className="mt-8 space-y-3">
             {files.map((file) => (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
-                key={file.name} 
+                key={file.name}
                 className="flex items-center justify-between p-3 bg-zinc-900 border border-white/5 rounded-sm"
               >
                 <div className="flex items-center gap-3">
@@ -86,7 +179,7 @@ export const UploadZone = () => {
                   <span className="text-zinc-300 font-bold text-sm truncate max-w-[200px]">{file.name}</span>
                   <span className="text-zinc-600 text-[10px] uppercase font-black">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
                 </div>
-                <button 
+                <button
                   onClick={() => removeFile(file.name)}
                   className="text-zinc-500 hover:text-red-500 transition-colors"
                 >
@@ -99,13 +192,18 @@ export const UploadZone = () => {
       </div>
 
       <div className="mt-12 flex flex-col items-center">
-        <Button 
-          variant="primary" 
-          size="lg" 
-          className="w-full bg-safety-orange py-6 text-xl shadow-[0_6px_0_0_#995400] active:shadow-none active:translate-y-1 transition-all"
-          disabled={files.length === 0}
+        <Button
+          variant="primary"
+          size="lg"
+          className="w-full bg-safety-orange py-6 text-xl shadow-[0_6px_0_0_#995400] active:shadow-none active:translate-y-1 transition-all disabled:opacity-50"
+          disabled={files.length === 0 || submitting}
+          onClick={handleRequestQuote}
         >
-          REQUEST QUOTE
+          {submitting ? (
+            <><Loader2 className="w-6 h-6 mr-3 animate-spin" /> PROCESSING...</>
+          ) : (
+            'REQUEST QUOTE'
+          )}
         </Button>
         <p className="mt-4 font-handwriting text-zinc-500 text-sm italic">
           * Engineering review takes approximately 2-4 hours.

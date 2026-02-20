@@ -21,8 +21,8 @@ export const metadata: Metadata = {
   },
 };
 
-
 import { SessionProvider } from "@/components/providers/SessionProvider";
+import { CartProvider } from "@/lib/cart-context";
 
 export default function RootLayout({
   children,
@@ -35,11 +35,11 @@ export default function RootLayout({
         className={`${inter.variable} ${architectsDaughter.variable} antialiased`}
       >
         <SessionProvider>
-          {children}
+          <CartProvider>
+            {children}
+          </CartProvider>
         </SessionProvider>
       </body>
     </html>
   );
 }
-
-

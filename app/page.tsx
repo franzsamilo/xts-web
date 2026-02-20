@@ -1,7 +1,7 @@
 "use client";
 
-import React from 'react';
-import Image from "next/image";
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { PageShell } from '@/components/layout/PageShell';
 import { Button } from '@/components/ui/Button';
@@ -9,14 +9,8 @@ import { Card } from '@/components/ui/Card';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { Badge } from '@/components/ui/Badge';
 import { FabricationIcon, ConsultationIcon, ShopIcon, CommunityIcon } from '@/components/icons';
-import { ArrowRight, Box, Cpu, Hammer } from 'lucide-react';
-
-const featuredProducts = [
-  { id: 1, name: 'Core Controller V4', price: '$89.00', category: 'Robotics', tag: 'Hot' },
-  { id: 2, name: 'Precision Stepper Motor', price: '$24.50', category: 'Motion', tag: 'New' },
-  { id: 3, name: 'LiPo Battery Pack 3S', price: '$35.00', category: 'Power', tag: 'In Stock' },
-  { id: 4, name: 'Aluminum Extrusion Kit', price: '$120.00', category: 'Hardware', tag: 'Free Ship' },
-];
+import { ArrowRight, Box, Cpu, Hammer, Activity, Check } from 'lucide-react';
+import { useCart } from '@/lib/cart-context';
 
 const serviceCards = [
   { 
@@ -40,11 +34,52 @@ const serviceCards = [
 ];
 
 export default function Home() {
+  const [products, setProducts] = useState<any[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+  const { addToCart } = useCart();
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const res = await fetch('/api/products');
+        if (res.ok) {
+          const data = await res.json();
+          setProducts(data.slice(0, 4)); // show max 4 featured
+        }
+      } catch (e) {
+        console.error("Failed to fetch featured products", e);
+      } finally {
+        setLoadingProducts(false);
+      }
+    };
+    fetchProducts();
+  }, []);
+
+  const handleAddToCart = (product: any) => {
+    addToCart({
+      id: product.id,
+      name: product.name,
+      price: parseFloat(product.price),
+      category: product.category,
+      sku: product.sku,
+      tag: product.tag,
+    });
+    setAddedIds(prev => new Set(prev).add(product.id));
+    setTimeout(() => {
+      setAddedIds(prev => {
+        const next = new Set(prev);
+        next.delete(product.id);
+        return next;
+      });
+    }, 1500);
+  };
+
   return (
     <PageShell>
       {/* Hero Section */}
       <section className="relative overflow-hidden py-20 lg:py-32">
-        <div className="container mx-auto px-4 relative z-10">
+        <div className="container mx-auto px-6 relative z-10">
           <div className="max-w-4xl">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
@@ -61,12 +96,16 @@ export default function Home() {
                 Unlock the tools, services, and expertise to build the impossible. From hardware kits to custom-machined parts, XTS WEB is your digital workbench.
               </p>
               <div className="flex flex-wrap gap-4">
-                <Button size="lg" className="group">
-                  Browse Shop <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
-                </Button>
-                <Button variant="outline" size="lg">
-                  Request Fabrication
-                </Button>
+                <Link href="/shop">
+                  <Button size="lg" className="group">
+                    Browse Shop <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </Link>
+                <Link href="/fabrication">
+                  <Button variant="outline" size="lg">
+                    Request Fabrication
+                  </Button>
+                </Link>
               </div>
             </motion.div>
           </div>
@@ -78,44 +117,81 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Featured Products */}
-      <section className="bg-zinc-100 py-24 dark:bg-zinc-900/50">
-        <div className="container mx-auto px-4">
+      {/* Featured Products — fetched from Firestore */}
+      <section className="bg-zinc-100 py-24">
+        <div className="container mx-auto px-6">
           <SectionHeading 
             title="Essential Gear" 
             annotation="Stocked & Ready" 
             dark={false}
           />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {featuredProducts.map((p) => (
-              <Card key={p.id} annotation={p.tag} className="flex flex-col h-full">
-                <div className="aspect-square bg-zinc-200 mb-4 rounded-sm flex items-center justify-center">
-                  <Box className="w-20 h-20 text-zinc-400 opacity-50" />
-                </div>
-                <div className="flex-grow">
-                  <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">{p.category}</span>
-                  <h3 className="text-xl font-bold text-esd-dark mb-2">{p.name}</h3>
-                </div>
-                <div className="flex items-center justify-between mt-4">
-                  <span className="text-lg font-black text-safety-orange">{p.price}</span>
-                  <Button variant="outline" size="sm" className="p-2 min-w-0">
-                    <ShopIcon className="w-5 h-5" />
-                  </Button>
-                </div>
-              </Card>
-            ))}
-          </div>
-          <div className="mt-12 text-center">
-            <Button variant="outline" className="text-esd-dark border-esd-dark hover:bg-esd-dark hover:text-white">
-              View Full Inventory
-            </Button>
-          </div>
+
+          {loadingProducts ? (
+            <div className="py-16 flex justify-center">
+              <Activity className="w-8 h-8 text-safety-orange animate-spin" />
+            </div>
+          ) : products.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+              {products.map((p) => (
+                <Card key={p.id} annotation={p.tag} className="flex flex-col h-full">
+                  <Link href={`/shop/${p.id}`} className="group block">
+                    <div className="aspect-square bg-zinc-200 mb-4 rounded-sm flex items-center justify-center relative overflow-hidden">
+                      <Box className="w-20 h-20 text-zinc-400 opacity-50 group-hover:scale-110 transition-transform duration-500" />
+                      <div className="absolute top-2 right-2">
+                        <Badge variant={p.stock < 10 ? 'warning' : 'new'}>
+                          {p.stock < 10 ? 'Low Stock' : 'In Stock'}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="flex-grow">
+                      <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">{p.category}</span>
+                      <h3 className="text-xl font-bold text-esd-dark mb-2 group-hover:text-safety-orange transition-colors">{p.name}</h3>
+                    </div>
+                  </Link>
+                  <div className="flex items-center justify-between mt-4">
+                    <span className="text-lg font-black text-safety-orange">PHP {parseFloat(p.price).toFixed(2)}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={`p-2 min-w-0 transition-all ${addedIds.has(p.id) ? 'bg-green-600 text-white border-green-600' : ''}`}
+                      onClick={() => handleAddToCart(p)}
+                    >
+                      {addedIds.has(p.id) ? (
+                        <Check className="w-5 h-5" />
+                      ) : (
+                        <ShopIcon className="w-5 h-5" />
+                      )}
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="py-16 text-center">
+              <p className="text-zinc-500 font-medium uppercase text-xs tracking-widest mb-6">Inventory is being loaded into the system.</p>
+              <Link href="/shop">
+                <Button variant="outline" className="text-esd-dark border-esd-dark">
+                  View Full Inventory
+                </Button>
+              </Link>
+            </div>
+          )}
+
+          {products.length > 0 && (
+            <div className="mt-12 text-center">
+              <Link href="/shop">
+                <Button variant="outline" className="text-esd-dark border-esd-dark hover:bg-esd-dark hover:text-white">
+                  View Full Inventory
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 
       {/* Services Section */}
       <section className="py-24">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-6">
           <SectionHeading 
             title="Custom Fab" 
             annotation="From CAD to Reality" 
@@ -139,9 +215,11 @@ export default function Home() {
                   <p className="text-zinc-600 mb-8 leading-relaxed">
                     {s.desc}
                   </p>
-                  <Button variant="primary" className="w-full">
-                    Upload Files
-                  </Button>
+                  <Link href="/fabrication">
+                    <Button variant="primary" className="w-full">
+                      Upload Files
+                    </Button>
+                  </Link>
                 </Card>
               </motion.div>
             ))}
@@ -151,7 +229,7 @@ export default function Home() {
 
       {/* Expert Consultation CTA */}
       <section className="py-24 relative overflow-hidden">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-6">
           <div className="bg-safety-orange p-1 px-1 rounded-sm shadow-2xl skew-y-[-1deg]">
             <div className="bg-esd-dark p-12 md:p-20 flex flex-col items-center text-center skew-y-[1deg]">
               <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mb-8">
@@ -164,17 +242,19 @@ export default function Home() {
               <p className="text-xl text-zinc-400 max-w-2xl mb-12">
                 Don't let technical hurdles stop your progress. Book a 1-on-1 session with our engineers for CAD design, robotics logic, or hardware debugging.
               </p>
-              <Button size="lg" className="bg-white text-esd-dark hover:bg-zinc-200 shadow-[0_4px_0_0_#d4d4d8]">
-                Schedule Session
-              </Button>
+              <Link href="/consultation">
+                <Button size="lg" className="bg-white text-esd-dark hover:bg-zinc-200 shadow-[0_4px_0_0_#d4d4d8]">
+                  Schedule Session
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
       </section>
 
       {/* Community Section */}
-      <section className="py-24 bg-zinc-100 dark:bg-zinc-900/50">
-        <div className="container mx-auto px-4">
+      <section className="py-24 bg-zinc-100">
+        <div className="container mx-auto px-6">
           <SectionHeading 
             title="The Feed" 
             annotation="Build Logs & Reviews" 
@@ -183,11 +263,11 @@ export default function Home() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <Card annotation="Recent Build" className="group">
               <div className="flex gap-6">
-                <div className="hidden sm:block w-32 h-32 bg-zinc-200 rounded-sm shrink-0 overflow-hidden">
-                  <Box className="w-full h-full p-8 text-zinc-400" />
+                <div className="hidden sm:flex w-32 h-32 bg-zinc-200 rounded-sm shrink-0 items-center justify-center">
+                  <FabricationIcon className="w-12 h-12 text-zinc-400" />
                 </div>
                 <div>
-                  <h4 className="text-xl font-bold mb-2 group-hover:text-safety-orange transition-colors cursor-pointer">Autonomous Rover with LiDAR Mapping</h4>
+                  <h4 className="text-xl font-bold text-esd-dark mb-2 group-hover:text-safety-orange transition-colors cursor-pointer">Autonomous Rover with LiDAR Mapping</h4>
                   <p className="text-zinc-600 mb-4 line-clamp-2">Just finished the first version of my mapping rover. Used the Core V4 from the shop and some custom laser-cut chassis parts...</p>
                   <div className="flex items-center gap-4 text-xs font-bold text-zinc-500 uppercase">
                     <span>By @RobotDave</span>
@@ -199,11 +279,11 @@ export default function Home() {
             </Card>
             <Card annotation="Question" className="group">
               <div className="flex gap-6">
-                <div className="hidden sm:block w-32 h-32 bg-zinc-200 rounded-sm shrink-0 flex items-center justify-center">
+                <div className="hidden sm:flex w-32 h-32 bg-zinc-200 rounded-sm shrink-0 items-center justify-center">
                   <CommunityIcon className="w-12 h-12 text-zinc-400" />
                 </div>
                 <div>
-                  <h4 className="text-xl font-bold mb-2 group-hover:text-safety-orange transition-colors cursor-pointer">Best way to shield I2C lines in high EMI?</h4>
+                  <h4 className="text-xl font-bold text-esd-dark mb-2 group-hover:text-safety-orange transition-colors cursor-pointer">Best way to shield I2C lines in high EMI?</h4>
                   <p className="text-zinc-600 mb-4 line-clamp-2">Having some issues with data corruption when the motors are running. Has anyone tried twisted pair or specific shielding...</p>
                   <div className="flex items-center gap-4 text-xs font-bold text-zinc-500 uppercase">
                     <span>By @CircuitQueen</span>
@@ -215,14 +295,16 @@ export default function Home() {
             </Card>
           </div>
           <div className="mt-12 text-center">
-            <Button variant="outline" className="text-esd-dark border-esd-dark">Join the Community</Button>
+            <Link href="/community">
+              <Button variant="outline" className="text-esd-dark border-esd-dark hover:bg-esd-dark hover:text-white">Join the Community</Button>
+            </Link>
           </div>
         </div>
       </section>
 
       {/* Newsletter */}
       <section className="py-24 border-t border-white/5">
-        <div className="container mx-auto px-4 flex flex-col items-center">
+        <div className="container mx-auto px-6 flex flex-col items-center">
           <h3 className="text-3xl font-black uppercase tracking-tighter text-white mb-8 text-center">Get Engineering Updates</h3>
           <div className="flex w-full max-w-md gap-2">
             <input 

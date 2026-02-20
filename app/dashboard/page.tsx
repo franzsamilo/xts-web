@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { PageShell } from '@/components/layout/PageShell';
@@ -9,14 +10,15 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { ServiceQueue } from '@/components/fabrication/ServiceQueue';
-import { Package, Settings, PenTool, LayoutDashboard, History, MessageCircle, User as UserIcon, ShoppingBag } from 'lucide-react';
-import { useSession } from 'next-auth/react';
+import { Package, Settings, PenTool, LayoutDashboard, History, MessageCircle, User as UserIcon, ShoppingBag, LogOut, Mail, Shield } from 'lucide-react';
+import { useSession, signOut } from 'next-auth/react';
 
 const orderHistory: any[] = [];
 
 export default function DashboardPage() {
   const { data: session } = useSession();
   const userRole = (session?.user as any)?.role || 'member';
+  const [activeTab, setActiveTab] = useState('overview');
 
   return (
     <PageShell>
@@ -42,7 +44,7 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="flex gap-4">
-            <Button variant="outline" size="sm" className="flex gap-2">
+            <Button variant="outline" size="sm" className="flex gap-2" onClick={() => setActiveTab('account')}>
               <Settings className="w-4 h-4" /> Account
             </Button>
             {userRole === 'admin' && (
@@ -55,7 +57,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <Tabs defaultValue="overview" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
             {/* Dashboard Nav */}
             <div className="space-y-2">
@@ -74,6 +76,9 @@ export default function DashboardPage() {
                 </TabsTrigger>
                 <TabsTrigger value="activity" className="group w-full p-0 bg-transparent data-[state=active]:bg-transparent border-none">
                    <DashboardTabContent icon={History} label="Activity Log" />
+                </TabsTrigger>
+                <TabsTrigger value="account" className="group w-full p-0 bg-transparent data-[state=active]:bg-transparent border-none">
+                   <DashboardTabContent icon={Settings} label="Account" />
                 </TabsTrigger>
                 
                 <div className="pt-8 pb-4">
@@ -155,7 +160,7 @@ export default function DashboardPage() {
                           <Package className="w-6 h-6 text-zinc-600" />
                         </div>
                         <h4 className="text-lg font-black text-white uppercase tracking-tighter mb-1">No Orders Logged</h4>
-                        <p className="text-xs text-zinc-500 max-w-xs mb-6 font-medium">Your account hasn't processed any hardware acquisitions yet.</p>
+                        <p className="text-xs text-zinc-500 max-w-xs mb-6 font-medium">Your account hasn&apos;t processed any hardware acquisitions yet.</p>
                         <Button variant="outline" size="sm" onClick={() => window.location.href = '/shop'}>Visit Shop</Button>
                       </div>
                     )}
@@ -201,6 +206,70 @@ export default function DashboardPage() {
                        </div>
                     </div>
                   </Card>
+
+                  <Card className="border-2 border-transparent hover:border-blue-600 transition-all cursor-pointer group" onClick={() => window.location.href='/apply/seller'}>
+                    <div className="flex gap-6 p-4">
+                       <div className="w-16 h-16 bg-zinc-900 rounded-sm flex items-center justify-center shrink-0 border border-white/10 group-hover:bg-blue-600 group-hover:scale-110 transition-all duration-300">
+                         <ShoppingBag className="w-8 h-8 text-zinc-500 group-hover:text-white" />
+                       </div>
+                       <div>
+                         <h4 className="text-xl font-black text-esd-dark uppercase mb-2">Register as Vendor</h4>
+                         <p className="text-xs text-zinc-600 leading-relaxed font-medium">List your hardware, components, and tools on the XTS marketplace. Reach thousands of engineers.</p>
+                       </div>
+                    </div>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="account" className="mt-0 space-y-8">
+                <SectionHeader title="Account Settings" description="Manage your profile and preferences." />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <Card className="border border-white/5 bg-black/20">
+                    <div className="flex items-center gap-6 mb-8">
+                      {session?.user?.image ? (
+                        <img src={session.user.image} alt="Profile" className="w-16 h-16 rounded-sm border-2 border-safety-orange" />
+                      ) : (
+                        <div className="w-16 h-16 bg-zinc-800 rounded-sm flex items-center justify-center border border-white/10">
+                          <UserIcon className="w-8 h-8 text-zinc-600" />
+                        </div>
+                      )}
+                      <div>
+                        <h4 className="text-xl font-black text-white uppercase tracking-tighter">{session?.user?.name || 'User'}</h4>
+                        <p className="text-xs text-zinc-500 font-mono">{session?.user?.email}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3 p-3 bg-zinc-900/50 rounded-sm border border-white/5">
+                        <Mail className="w-4 h-4 text-zinc-500" />
+                        <div>
+                          <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest block">Email</span>
+                          <span className="text-sm text-white font-medium">{session?.user?.email}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 p-3 bg-zinc-900/50 rounded-sm border border-white/5">
+                        <Shield className="w-4 h-4 text-zinc-500" />
+                        <div>
+                          <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest block">Role</span>
+                          <span className="text-sm text-safety-orange font-bold uppercase">{userRole}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  <div className="space-y-6">
+                    <Card className="border border-white/5 bg-black/20">
+                      <h4 className="text-sm font-black text-white uppercase tracking-tighter mb-4">Session</h4>
+                      <p className="text-xs text-zinc-500 mb-6">Auth via Google OAuth. Session managed by NextAuth JWT.</p>
+                      <Button 
+                        variant="danger" 
+                        className="w-full flex items-center justify-center gap-2" 
+                        onClick={() => signOut({ callbackUrl: '/' })}
+                      >
+                        <LogOut className="w-4 h-4" /> Sign Out
+                      </Button>
+                    </Card>
+                  </div>
                 </div>
               </TabsContent>
             </div>

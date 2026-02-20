@@ -1,25 +1,23 @@
 import { NextResponse } from 'next/server';
 import { getAllUsers } from '@/lib/users';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 export async function GET() {
-  const session = await getServerSession();
-  
-  // Basic security check
-  if (!session || (session.user as any)?.role !== 'admin') {
-     // For mock purposes during dev, we might allow this, 
-     // but in production this should be strictly enforced.
-     // However, since the user wants to see "every user logged in", 
-     // and we are using mock data elsewhere, let's provide a way to get real users if available.
+  const session = await getServerSession(authOptions);
+
+  if (!session || !(session.user as any)?.role?.includes('admin')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const users = await getAllUsers();
   return NextResponse.json(users);
 }
+
 export async function PATCH(req: Request) {
-  const session = await getServerSession();
-  
-  if (!session || (session.user as any)?.role !== 'admin') {
+  const session = await getServerSession(authOptions);
+
+  if (!session || !(session.user as any)?.role?.includes('admin')) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
