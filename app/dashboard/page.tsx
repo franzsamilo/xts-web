@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { PageShell } from '@/components/layout/PageShell';
@@ -10,15 +10,35 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { ServiceQueue } from '@/components/fabrication/ServiceQueue';
-import { Package, Settings, PenTool, LayoutDashboard, History, MessageCircle, User as UserIcon, ShoppingBag, LogOut, Mail, Shield } from 'lucide-react';
+import { Package, Settings, PenTool, LayoutDashboard, History, MessageCircle, User as UserIcon, ShoppingBag, LogOut, Mail, Shield, Activity } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 
-const orderHistory: any[] = [];
-
 export default function DashboardPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const userRole = (session?.user as any)?.role || 'member';
   const [activeTab, setActiveTab] = useState('overview');
+  const [userOrders, setUserOrders] = useState<any[]>([]);
+  const [userConsultations, setUserConsultations] = useState<any[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    const fetchUserData = async () => {
+      try {
+        const [ordRes, consultRes] = await Promise.all([
+          fetch('/api/orders'),
+          fetch('/api/consultations'),
+        ]);
+        if (ordRes.ok) setUserOrders(await ordRes.json());
+        if (consultRes.ok) setUserConsultations(await consultRes.json());
+      } catch (e) {
+        console.error('Failed to fetch dashboard data', e);
+      } finally {
+        setLoadingData(false);
+      }
+    };
+    fetchUserData();
+  }, [status]);
 
   return (
     <PageShell>
@@ -47,7 +67,7 @@ export default function DashboardPage() {
             <Button variant="outline" size="sm" className="flex gap-2" onClick={() => setActiveTab('account')}>
               <Settings className="w-4 h-4" /> Account
             </Button>
-            {userRole === 'admin' && (
+            {userRole.includes('admin') && (
               <Link href="/admin">
                 <Button className="flex gap-2 bg-red-600 hover:bg-red-700 shadow-[0_4px_0_0_#991b1b]">
                   <LayoutDashboard className="w-4 h-4" /> Admin Terminal
@@ -91,7 +111,7 @@ export default function DashboardPage() {
                   </TabsTrigger>
                 )}
                 
-                {userRole === 'admin' && (
+                {userRole.includes('admin') && (
                   <button 
                     onClick={() => window.location.href='/admin?tab=inventory'}
                     className="w-full flex items-center gap-4 px-6 py-4 rounded-sm transition-all font-bold uppercase text-xs tracking-tighter text-left text-zinc-500 hover:bg-zinc-800/50 hover:text-white"
@@ -100,7 +120,7 @@ export default function DashboardPage() {
                   </button>
                 )}
                 
-                {(userRole === 'admin' || userRole === 'expert') && (
+                {(userRole.includes('admin') || userRole.includes('expert')) && (
                   <button 
                     onClick={() => window.location.href='/admin?tab=consultations'}
                     className="w-full flex items-center gap-4 px-6 py-4 rounded-sm transition-all font-bold uppercase text-xs tracking-tighter text-left text-zinc-500 hover:bg-zinc-800/50 hover:text-white"
@@ -116,9 +136,9 @@ export default function DashboardPage() {
               <TabsContent value="overview" className="space-y-12 mt-0">
                 {/* Stats Row */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                  <StatCard label="Completed Orders" value="0" sub="No history found" />
-                  <StatCard label="Active Projects" value="0" sub="Queue is idle" />
-                  <StatCard label="Consultations" value="0" sub="No sessions booked" />
+                  <StatCard label="Completed Orders" value={String(userOrders.filter(o => o.status === 'delivered').length)} sub={userOrders.length > 0 ? `${userOrders.length} total` : 'No orders yet'} />
+                  <StatCard label="Active Projects" value="—" sub="Via fabrication queue" />
+                  <StatCard label="Consultations" value={String(userConsultations.length)} sub={userConsultations.length > 0 ? `${userConsultations.filter(c => c.status === 'confirmed').length} confirmed` : 'No sessions booked'} />
                 </div>
 
                 {/* Active Fabrication */}
@@ -127,7 +147,7 @@ export default function DashboardPage() {
                     <PenTool className="w-5 h-5 text-safety-orange" />
                     Active Fab Jobs
                   </h3>
-                  <ServiceQueue orders={[]} />
+                  <ServiceQueue autoFetch={true} />
                 </div>
 
                 {/* Recent Shop Orders */}
@@ -137,20 +157,19 @@ export default function DashboardPage() {
                     Recent Shop Orders
                   </h3>
                   <div className="space-y-4">
-                    {orderHistory.length > 0 ? (
-                      orderHistory.map(order => (
-                        <Card key={order.id} className="flex flex-col md:flex-row md:items-center justify-between gap-6 hover:rotate-0 transition-transform">
+                    {userOrders.length > 0 ? (
+                      userOrders.slice(0, 5).map(order => (
+                        <Card key={order.id} className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                           <div>
-                            <span className="text-xs font-black text-zinc-400 uppercase tracking-widest">{order.date}</span>
-                            <h4 className="text-xl font-bold text-esd-dark">{order.id}</h4>
-                            <p className="text-zinc-600 text-sm">{order.items}</p>
+                            <span className="text-xs font-black text-zinc-400 uppercase tracking-widest">{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'Recent'}</span>
+                            <h4 className="text-xl font-bold text-esd-dark mt-1">#{order.id?.slice(0, 8).toUpperCase()}</h4>
+                            <p className="text-zinc-600 text-sm">{(order.items || []).map((i: any) => i.name).join(', ')}</p>
                           </div>
                           <div className="flex items-center gap-8">
                              <div className="text-right">
-                               <p className="text-xl font-black text-esd-dark">{order.total}</p>
-                               <Badge variant="completed">{order.status}</Badge>
+                               <p className="text-xl font-black text-esd-dark">PHP {(order.total || 0).toFixed(2)}</p>
+                               <Badge variant={order.status === 'delivered' ? 'completed' : order.status === 'shipped' ? 'in-progress' : 'pending'}>{(order.status || 'processing').toUpperCase()}</Badge>
                              </div>
-                             <Button variant="outline" size="sm">Details</Button>
                           </div>
                         </Card>
                       ))
@@ -170,17 +189,63 @@ export default function DashboardPage() {
 
               <TabsContent value="orders" className="mt-0">
                 <SectionHeader title="Order History" description="Manage your hardware acquisitions and tracking." />
-                <EmptyState icon={ShoppingBag} title="No Orders" description="You haven't placed any orders yet." actionLabel="Go to Shop" actionHref="/shop" />
+                {loadingData ? (
+                  <div className="py-20 flex justify-center"><Activity className="w-8 h-8 text-safety-orange animate-spin" /></div>
+                ) : userOrders.length > 0 ? (
+                  <div className="space-y-4">
+                    {userOrders.map(order => (
+                      <Card key={order.id} className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div>
+                          <span className="text-xs font-black text-zinc-400 uppercase tracking-widest">{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'Recent'}</span>
+                          <h4 className="text-xl font-bold text-esd-dark mt-1">#{order.id?.slice(0, 8).toUpperCase()}</h4>
+                          <div className="mt-2 space-y-1">
+                            {(order.items || []).map((item: any, i: number) => (
+                              <p key={i} className="text-xs text-zinc-500">{item.name} x{item.quantity} — PHP {(item.price * item.quantity).toFixed(2)}</p>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xl font-black text-esd-dark">PHP {(order.total || 0).toFixed(2)}</p>
+                          <Badge variant={order.status === 'delivered' ? 'completed' : order.status === 'shipped' ? 'in-progress' : 'pending'}>{(order.status || 'processing').toUpperCase()}</Badge>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState icon={ShoppingBag} title="No Orders" description="You haven't placed any orders yet." actionLabel="Go to Shop" actionHref="/shop" />
+                )}
               </TabsContent>
 
               <TabsContent value="fabrication" className="mt-0">
                 <SectionHeader title="Fabrication Queue" description="Track your custom parts and manufacturing jobs." />
-                <ServiceQueue orders={[]} />
+                <ServiceQueue autoFetch={true} />
               </TabsContent>
 
               <TabsContent value="consultations" className="mt-0">
                 <SectionHeader title="My Consultations" description="View upcoming meetings and saved engineering notes." />
-                <EmptyState icon={MessageCircle} title="No Sessions" description="Connect with an expert to start your first session." actionLabel="Find an Expert" actionHref="/consultation" />
+                {loadingData ? (
+                  <div className="py-20 flex justify-center"><Activity className="w-8 h-8 text-safety-orange animate-spin" /></div>
+                ) : userConsultations.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {userConsultations.map((c: any) => (
+                      <Card key={c.id} className="border border-white/5">
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <h4 className="text-lg font-black text-esd-dark uppercase">{c.expertName}</h4>
+                            <p className="text-xs text-zinc-500">{c.expertTitle}</p>
+                          </div>
+                          <Badge variant={c.status === 'confirmed' ? 'completed' : 'pending'}>{(c.status || 'pending').toUpperCase()}</Badge>
+                        </div>
+                        <div className="flex items-center gap-4 p-3 bg-zinc-100 rounded-sm">
+                          <Activity className="w-4 h-4 text-safety-orange" />
+                          <span className="text-xs font-mono text-zinc-600">{c.slot || 'TBD'} — {c.expertPrice}</span>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState icon={MessageCircle} title="No Sessions" description="Connect with an expert to start your first session." actionLabel="Find an Expert" actionHref="/consultation" />
+                )}
               </TabsContent>
 
               <TabsContent value="activity" className="mt-0">

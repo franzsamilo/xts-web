@@ -7,7 +7,8 @@ import { SectionHeading } from '@/components/ui/SectionHeading';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Calendar, Clock, Star, Video, MessageSquare, ShieldCheck, X, CheckCircle2 } from 'lucide-react';
+import { Calendar, Clock, Star, Video, MessageSquare, ShieldCheck, X, CheckCircle2, Activity } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 
 const experts = [
   {
@@ -46,16 +47,40 @@ const experts = [
 ];
 
 export default function ConsultationPage() {
+  const { data: session } = useSession();
   const [selectedExpert, setSelectedExpert] = useState<number | null>(null);
   const [bookingModal, setBookingModal] = useState<typeof experts[0] | null>(null);
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
+  const [bookingLoading, setBookingLoading] = useState(false);
 
-  const handleBooking = () => {
-    setBookingConfirmed(true);
-    setTimeout(() => {
-      setBookingModal(null);
-      setBookingConfirmed(false);
-    }, 2500);
+  const handleBooking = async () => {
+    if (!bookingModal) return;
+    setBookingLoading(true);
+
+    try {
+      const res = await fetch('/api/consultations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expertName: bookingModal.name,
+          expertTitle: bookingModal.title,
+          expertPrice: bookingModal.price,
+          slot: bookingModal.availability.replace('Next: ', ''),
+        }),
+      });
+
+      if (res.ok) {
+        setBookingConfirmed(true);
+        setTimeout(() => {
+          setBookingModal(null);
+          setBookingConfirmed(false);
+        }, 2500);
+      }
+    } catch (e) {
+      console.error('Booking failed', e);
+    } finally {
+      setBookingLoading(false);
+    }
   };
 
   return (
@@ -78,7 +103,6 @@ export default function ConsultationPage() {
               >
                 <div className="flex flex-col md:flex-row gap-8">
                   <div className="w-32 h-40 bg-zinc-200 rounded-sm shrink-0 flex items-center justify-center relative overflow-hidden group">
-                     {/* Placeholder for Expert Avatar */}
                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                      <User className="w-16 h-16 text-zinc-400" />
                   </div>
@@ -191,7 +215,7 @@ export default function ConsultationPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={() => { if (!bookingConfirmed) { setBookingModal(null); } }}
+            onClick={() => { if (!bookingConfirmed && !bookingLoading) { setBookingModal(null); } }}
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -202,7 +226,6 @@ export default function ConsultationPage() {
             >
               {!bookingConfirmed ? (
                 <>
-                  {/* Modal Header */}
                   <div className="bg-safety-orange p-1">
                     <div className="bg-zinc-900 p-6 flex items-center justify-between">
                       <h3 className="text-xl font-black text-white uppercase tracking-tighter">Confirm Booking</h3>
@@ -212,7 +235,6 @@ export default function ConsultationPage() {
                     </div>
                   </div>
 
-                  {/* Modal Body */}
                   <div className="p-6 space-y-6">
                     <div className="flex items-center gap-4">
                       <div className="w-14 h-14 bg-zinc-800 rounded-sm flex items-center justify-center border border-white/10">
@@ -241,39 +263,37 @@ export default function ConsultationPage() {
                       ))}
                     </div>
 
+                    {!session && (
+                      <div className="p-3 bg-red-950/30 border border-red-500/20 rounded-sm">
+                        <p className="text-xs text-red-400 font-bold">You must be signed in to book a session.</p>
+                      </div>
+                    )}
+
                     <p className="text-xs text-zinc-500 leading-relaxed border-t border-white/5 pt-4">
-                      By confirming, a booking request will be sent to <strong className="text-white">{bookingModal.name}</strong>. You will be notified once the session is confirmed. Payment is collected upon session completion.
+                      By confirming, a booking request will be sent to <strong className="text-white">{bookingModal.name}</strong>. You will be notified once the session is confirmed.
                     </p>
                   </div>
 
-                  {/* Modal Actions */}
                   <div className="p-6 pt-0 flex gap-4">
-                    <Button 
-                      variant="outline" 
-                      className="flex-1"
-                      onClick={() => setBookingModal(null)}
-                    >
-                      Cancel
-                    </Button>
+                    <Button variant="outline" className="flex-1" onClick={() => setBookingModal(null)}>Cancel</Button>
                     <Button 
                       className="flex-1 bg-safety-orange hover:bg-safety-orange/80 shadow-[0_4px_0_0_#995400]"
                       onClick={handleBooking}
+                      disabled={bookingLoading || !session}
                     >
-                      Confirm Booking
+                      {bookingLoading ? (
+                        <span className="flex items-center gap-2"><Activity className="w-4 h-4 animate-spin" /> Booking...</span>
+                      ) : 'Confirm Booking'}
                     </Button>
                   </div>
                 </>
               ) : (
                 <div className="p-12 flex flex-col items-center text-center">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                  >
+                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }}>
                     <CheckCircle2 className="w-16 h-16 text-green-500 mb-6" />
                   </motion.div>
                   <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-2">Booking Submitted</h3>
-                  <p className="text-sm text-zinc-500">Your session request with <strong className="text-safety-orange">{bookingModal.name}</strong> has been transmitted. Check your dashboard for updates.</p>
+                  <p className="text-sm text-zinc-500">Your session request with <strong className="text-safety-orange">{bookingModal.name}</strong> has been saved. Check your dashboard for updates.</p>
                 </div>
               )}
             </motion.div>

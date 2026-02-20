@@ -44,3 +44,13 @@ export async function deleteProductFromDb(id: string) {
     throw error;
   }
 }
+
+export async function updateProduct(id: string, data: any) {
+  try {
+    await adminDb.collection('products').doc(id).update(data);
+    return { id, ...data };
+  } catch (error) {
+    console.error('Error updating product:', error);
+    throw error;
+  }
+}

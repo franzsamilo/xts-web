@@ -8,8 +8,16 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input, Textarea } from '@/components/ui/Input';
-import { MessageSquare, ThumbsUp, Share2, Pin, CheckCircle2, X, Activity } from 'lucide-react';
+import { MessageSquare, ThumbsUp, Share2, Pin, CheckCircle2, X, Activity, Send } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+
+interface Comment {
+  id: string;
+  content: string;
+  author: string;
+  avatar: string;
+  createdAt: string;
+}
 
 interface Post {
   id: string;
@@ -50,9 +58,15 @@ export default function CommunityPage() {
   const [likingIds, setLikingIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
 
+  // Comment state
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [commentsByPost, setCommentsByPost] = useState<Record<string, Comment[]>>({});
+  const [commentInput, setCommentInput] = useState<Record<string, string>>({});
+  const [sendingComment, setSendingComment] = useState<Set<string>>(new Set());
+  const [loadingComments, setLoadingComments] = useState<Set<string>>(new Set());
+
   const userId = (session?.user as any)?.id || session?.user?.email || '';
 
-  // Fetch posts from Firestore on mount
   useEffect(() => {
     const fetchPosts = async () => {
       try {
@@ -60,14 +74,10 @@ export default function CommunityPage() {
         if (res.ok) {
           const data = await res.json();
           setPosts(data);
-
-          // Mark posts the current user has already liked
           if (userId) {
             const alreadyLiked = new Set<string>();
             data.forEach((p: Post) => {
-              if (p.likedBy?.includes(userId)) {
-                alreadyLiked.add(p.id);
-              }
+              if (p.likedBy?.includes(userId)) alreadyLiked.add(p.id);
             });
             setLikedPosts(alreadyLiked);
           }
@@ -89,18 +99,12 @@ export default function CommunityPage() {
   const handlePublish = async () => {
     if (!postTitle.trim() || !postContent.trim()) return;
     setPublishing(true);
-
     try {
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: postTitle.trim(),
-          content: postContent.trim(),
-          tag: postTag,
-        }),
+        body: JSON.stringify({ title: postTitle.trim(), content: postContent.trim(), tag: postTag }),
       });
-
       if (res.ok) {
         const newPost = await res.json();
         setPosts(prev => [{ ...newPost, createdAt: new Date().toISOString() }, ...prev]);
@@ -111,7 +115,6 @@ export default function CommunityPage() {
         showToast('Post published successfully!');
       }
     } catch (e) {
-      console.error('Failed to publish post', e);
       showToast('Failed to publish. Try again.');
     } finally {
       setPublishing(false);
@@ -120,27 +123,76 @@ export default function CommunityPage() {
 
   const handleLike = async (id: string) => {
     if (likedPosts.has(id) || likingIds.has(id)) return;
-
-    // Optimistic update
     setLikedPosts(prev => new Set(prev).add(id));
     setPosts(prev => prev.map(p => p.id === id ? { ...p, likes: p.likes + 1 } : p));
     setLikingIds(prev => new Set(prev).add(id));
-
     try {
       const res = await fetch(`/api/posts/${id}`, { method: 'PATCH' });
       if (res.ok) {
         const result = await res.json();
         if (result.alreadyLiked) {
-          // Revert optimistic update if server says already liked
           setPosts(prev => prev.map(p => p.id === id ? { ...p, likes: result.likes } : p));
         }
       }
-    } catch (e) {
-      // Revert on error
-      setLikedPosts(prev => { const next = new Set(prev); next.delete(id); return next; });
+    } catch {
+      setLikedPosts(prev => { const n = new Set(prev); n.delete(id); return n; });
       setPosts(prev => prev.map(p => p.id === id ? { ...p, likes: p.likes - 1 } : p));
     } finally {
-      setLikingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+      setLikingIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+    }
+  };
+
+  const toggleComments = async (postId: string) => {
+    const next = new Set(expandedComments);
+    if (next.has(postId)) {
+      next.delete(postId);
+      setExpandedComments(next);
+      return;
+    }
+    next.add(postId);
+    setExpandedComments(next);
+
+    // Fetch comments if not already loaded
+    if (!commentsByPost[postId]) {
+      setLoadingComments(prev => new Set(prev).add(postId));
+      try {
+        const res = await fetch(`/api/posts/${postId}/comments`);
+        if (res.ok) {
+          const comments = await res.json();
+          setCommentsByPost(prev => ({ ...prev, [postId]: comments }));
+        }
+      } catch (e) {
+        console.error('Failed to load comments', e);
+      } finally {
+        setLoadingComments(prev => { const n = new Set(prev); n.delete(postId); return n; });
+      }
+    }
+  };
+
+  const handleComment = async (postId: string) => {
+    const text = commentInput[postId]?.trim();
+    if (!text) return;
+
+    setSendingComment(prev => new Set(prev).add(postId));
+    try {
+      const res = await fetch(`/api/posts/${postId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: text }),
+      });
+      if (res.ok) {
+        const newComment = await res.json();
+        setCommentsByPost(prev => ({
+          ...prev,
+          [postId]: [...(prev[postId] || []), newComment],
+        }));
+        setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments: p.comments + 1 } : p));
+        setCommentInput(prev => ({ ...prev, [postId]: '' }));
+      }
+    } catch (e) {
+      showToast('Failed to post comment.');
+    } finally {
+      setSendingComment(prev => { const n = new Set(prev); n.delete(postId); return n; });
     }
   };
 
@@ -168,75 +220,41 @@ export default function CommunityPage() {
 
       <div className="container mx-auto px-6 py-20">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
-          <SectionHeading 
-            title="The Feed" 
-            annotation="Engineering Community" 
-            dark={true}
-            className="mb-0"
-          />
+          <SectionHeading title="The Feed" annotation="Engineering Community" dark={true} className="mb-0" />
           <Button onClick={() => setShowCreate(!showCreate)} className="whitespace-nowrap">
             {showCreate ? 'Close Editor' : 'Create Post'}
           </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
-          {/* Main Feed */}
           <div className="lg:col-span-3 space-y-8">
-            {/* Post Creation Form */}
+            {/* Create */}
             <AnimatePresence>
               {showCreate && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.2 }}
-                >
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }}>
                   <Card className="mb-4 border-2 border-safety-orange/30">
                     <div className="space-y-6">
                       <h3 className="text-xl font-black uppercase text-esd-dark">Share your Work</h3>
-
                       <div>
                         <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest block mb-2">Post Type</label>
                         <div className="flex flex-wrap gap-2">
                           {tagOptions.map(tag => (
-                            <button
-                              key={tag}
-                              onClick={() => setPostTag(tag)}
+                            <button key={tag} onClick={() => setPostTag(tag)}
                               className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tighter transition-all border ${
-                                postTag === tag
-                                  ? 'bg-safety-orange border-safety-orange text-white'
-                                  : 'bg-zinc-100 border-zinc-200 text-zinc-500 hover:border-zinc-400'
+                                postTag === tag ? 'bg-safety-orange border-safety-orange text-white' : 'bg-zinc-100 border-zinc-200 text-zinc-500 hover:border-zinc-400'
                               }`}
-                            >
-                              {tag}
-                            </button>
+                            >{tag}</button>
                           ))}
                         </div>
                       </div>
-
-                      <Input 
-                        placeholder="Post Title" 
-                        className="bg-white border-zinc-200 text-esd-dark" 
-                        value={postTitle}
-                        onChange={(e) => setPostTitle(e.target.value)}
-                      />
-                      <Textarea 
-                        placeholder="What are you building? Share your progress, ask questions, or start a discussion..." 
-                        className="bg-white border-zinc-200 text-esd-dark min-h-[120px]" 
-                        value={postContent}
-                        onChange={(e) => setPostContent(e.target.value)}
-                      />
+                      <Input placeholder="Post Title" className="bg-white border-zinc-200 text-esd-dark" value={postTitle} onChange={(e) => setPostTitle(e.target.value)} />
+                      <Textarea placeholder="What are you building?..." className="bg-white border-zinc-200 text-esd-dark min-h-[120px]" value={postContent} onChange={(e) => setPostContent(e.target.value)} />
                       <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">
-                          Posting as @{session?.user?.name?.split(' ')[0] || 'Anonymous'}
-                        </span>
+                        <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Posting as @{session?.user?.name?.split(' ')[0] || 'Anonymous'}</span>
                         <div className="flex gap-4">
                           <Button variant="ghost" className="text-zinc-500" onClick={() => { setShowCreate(false); setPostTitle(''); setPostContent(''); }}>Cancel</Button>
-                          <Button 
-                            onClick={handlePublish} 
-                            disabled={!postTitle.trim() || !postContent.trim() || publishing}
-                            className="shadow-[0_4px_0_0_#995400] active:translate-y-[2px] active:shadow-none transition-all"
-                          >
+                          <Button onClick={handlePublish} disabled={!postTitle.trim() || !postContent.trim() || publishing}
+                            className="shadow-[0_4px_0_0_#995400] active:translate-y-[2px] active:shadow-none transition-all">
                             {publishing ? 'Publishing...' : 'Publish Post'}
                           </Button>
                         </div>
@@ -249,83 +267,122 @@ export default function CommunityPage() {
 
             {/* Posts */}
             {loading ? (
-              <div className="py-20 flex justify-center">
-                <Activity className="w-8 h-8 text-safety-orange animate-spin" />
-              </div>
+              <div className="py-20 flex justify-center"><Activity className="w-8 h-8 text-safety-orange animate-spin" /></div>
             ) : (
               <AnimatePresence mode="popLayout">
                 {posts.length > 0 ? (
                   posts.map((post) => (
-                    <motion.div
-                      key={post.id}
-                      layout
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{ duration: 0.3 }}
-                    >
+                    <motion.div key={post.id} layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
                       <Card className="relative group">
                         {post.isPinned && (
                           <div className="absolute top-4 right-4 text-safety-orange flex items-center gap-1">
-                            <Pin className="w-3 h-3 fill-current" />
-                            <span className="text-[10px] font-black uppercase">Pinned</span>
+                            <Pin className="w-3 h-3 fill-current" /><span className="text-[10px] font-black uppercase">Pinned</span>
                           </div>
                         )}
-                        
                         <div className="flex gap-6">
                           <div className="hidden sm:flex flex-col items-center shrink-0">
-                            <div className="w-12 h-12 bg-zinc-800 rounded-sm flex items-center justify-center text-white font-black mb-2 shadow-lg border border-white/10">
-                              {post.avatar}
-                            </div>
+                            <div className="w-12 h-12 bg-zinc-800 rounded-sm flex items-center justify-center text-white font-black mb-2 shadow-lg border border-white/10">{post.avatar}</div>
                             <div className="h-full w-px bg-zinc-200" />
                           </div>
-
                           <div className="flex-grow">
                             <div className="flex items-center gap-3 mb-3">
                               <Badge variant={post.tag === 'Announcement' ? 'new' : post.tag === 'Question' ? 'warning' : 'pending'}>{post.tag}</Badge>
-                              <span className="text-xs font-bold text-zinc-500 uppercase tracking-tighter">
-                                @{post.author} • {timeAgo(post.createdAt)}
-                              </span>
+                              <span className="text-xs font-bold text-zinc-500 uppercase tracking-tighter">@{post.author} • {timeAgo(post.createdAt)}</span>
                             </div>
-                            
-                            <h3 className="text-2xl font-black text-esd-dark uppercase mb-4 group-hover:text-safety-orange transition-colors cursor-pointer">
-                              {post.title}
-                            </h3>
-                            
-                            <p className="text-zinc-600 mb-8 leading-relaxed whitespace-pre-wrap">
-                              {post.content}
-                            </p>
+                            <h3 className="text-2xl font-black text-esd-dark uppercase mb-4 group-hover:text-safety-orange transition-colors cursor-pointer">{post.title}</h3>
+                            <p className="text-zinc-600 mb-8 leading-relaxed whitespace-pre-wrap">{post.content}</p>
 
                             <div className="flex items-center gap-8 pt-6 border-t border-black/5">
-                              <button 
-                                className={`flex items-center gap-2 transition-colors ${
-                                  likedPosts.has(post.id) 
-                                    ? 'text-safety-orange cursor-default' 
-                                    : 'text-zinc-500 hover:text-safety-orange'
-                                }`} 
-                                onClick={() => handleLike(post.id)}
-                                disabled={likedPosts.has(post.id)}
+                              {/* Like */}
+                              <button
+                                className={`flex items-center gap-2 transition-colors ${likedPosts.has(post.id) ? 'text-safety-orange cursor-default' : 'text-zinc-500 hover:text-safety-orange'}`}
+                                onClick={() => handleLike(post.id)} disabled={likedPosts.has(post.id)}
                               >
                                 <ThumbsUp className={`w-4 h-4 ${likedPosts.has(post.id) ? 'fill-current' : ''}`} />
                                 <span className="text-sm font-bold">{post.likes}</span>
-                                {likedPosts.has(post.id) && (
-                                  <span className="text-[10px] font-black uppercase tracking-widest ml-1">Liked</span>
-                                )}
+                                {likedPosts.has(post.id) && <span className="text-[10px] font-black uppercase tracking-widest ml-1">Liked</span>}
                               </button>
-                              <button className="flex items-center gap-2 text-zinc-500 hover:text-safety-orange transition-colors">
+                              {/* Comments toggle */}
+                              <button
+                                className={`flex items-center gap-2 transition-colors ${expandedComments.has(post.id) ? 'text-safety-orange' : 'text-zinc-500 hover:text-safety-orange'}`}
+                                onClick={() => toggleComments(post.id)}
+                              >
                                 <MessageSquare className="w-4 h-4" />
                                 <span className="text-sm font-bold">{post.comments}</span>
                               </button>
-                              <button 
-                                className="flex items-center gap-2 text-zinc-500 hover:text-safety-orange transition-colors"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(`${window.location.origin}/community#${post.id}`);
-                                  showToast('Link copied to clipboard!');
-                                }}
-                              >
+                              {/* Share */}
+                              <button className="flex items-center gap-2 text-zinc-500 hover:text-safety-orange transition-colors"
+                                onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/community#${post.id}`); showToast('Link copied!'); }}>
                                 <Share2 className="w-4 h-4" />
                               </button>
                             </div>
+
+                            {/* Comments Section */}
+                            <AnimatePresence>
+                              {expandedComments.has(post.id) && (
+                                <motion.div
+                                  initial={{ opacity: 0, height: 0 }}
+                                  animate={{ opacity: 1, height: 'auto' }}
+                                  exit={{ opacity: 0, height: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="mt-6 pt-6 border-t border-black/5"
+                                >
+                                  {/* Existing comments */}
+                                  {loadingComments.has(post.id) ? (
+                                    <div className="py-4 flex justify-center"><Activity className="w-5 h-5 text-safety-orange animate-spin" /></div>
+                                  ) : (
+                                    <div className="space-y-4 mb-6">
+                                      {(commentsByPost[post.id] || []).length === 0 ? (
+                                        <p className="text-xs text-zinc-500 italic text-center py-4">No comments yet. Be the first to respond.</p>
+                                      ) : (
+                                        (commentsByPost[post.id] || []).map((c) => (
+                                          <div key={c.id} className="flex gap-3">
+                                            <div className="w-8 h-8 bg-zinc-800 rounded-full flex items-center justify-center text-[10px] text-white font-black shrink-0 border border-white/10">
+                                              {c.avatar}
+                                            </div>
+                                            <div className="flex-grow bg-zinc-50 rounded-sm p-3 border border-black/5">
+                                              <div className="flex items-center gap-2 mb-1">
+                                                <span className="text-xs font-black text-esd-dark uppercase">@{c.author}</span>
+                                                <span className="text-[10px] text-zinc-400">{timeAgo(c.createdAt)}</span>
+                                              </div>
+                                              <p className="text-sm text-zinc-700">{c.content}</p>
+                                            </div>
+                                          </div>
+                                        ))
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Comment input */}
+                                  {session ? (
+                                    <div className="flex gap-3">
+                                      <div className="w-8 h-8 bg-safety-orange rounded-full flex items-center justify-center text-[10px] text-white font-black shrink-0">
+                                        {session.user?.name?.[0]?.toUpperCase() || '?'}
+                                      </div>
+                                      <div className="flex-grow flex gap-2">
+                                        <Input
+                                          placeholder="Write a comment..."
+                                          className="bg-white border-zinc-200 text-esd-dark text-sm flex-grow"
+                                          value={commentInput[post.id] || ''}
+                                          onChange={(e) => setCommentInput(prev => ({ ...prev, [post.id]: e.target.value }))}
+                                          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleComment(post.id); } }}
+                                        />
+                                        <Button
+                                          size="sm"
+                                          className="px-3 min-w-0"
+                                          disabled={!commentInput[post.id]?.trim() || sendingComment.has(post.id)}
+                                          onClick={() => handleComment(post.id)}
+                                        >
+                                          {sendingComment.has(post.id) ? <Activity className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-zinc-500 italic text-center">Sign in to comment.</p>
+                                  )}
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </div>
                         </div>
                       </Card>
@@ -338,7 +395,7 @@ export default function CommunityPage() {
                         <MessageSquare className="w-8 h-8 text-zinc-700" />
                       </div>
                       <h4 className="text-2xl font-black text-white uppercase tracking-tighter mb-2">The Feed is Quiet</h4>
-                      <p className="text-sm text-zinc-500 max-w-sm mb-8 font-medium">Be the first to share a build log, ask a question, or start a discussion with the community.</p>
+                      <p className="text-sm text-zinc-500 max-w-sm mb-8 font-medium">Be the first to share a build log, ask a question, or start a discussion.</p>
                       <Button onClick={() => setShowCreate(true)}>Create First Post</Button>
                     </div>
                   </motion.div>

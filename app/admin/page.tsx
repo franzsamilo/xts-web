@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { Package, Users, Activity, Settings, Plus, Search, Hammer, AlertTriangle, MessageCircle } from 'lucide-react';
+import { Package, Users, Activity, Settings, Plus, Search, Hammer, AlertTriangle, MessageCircle, X, ClipboardList, Truck, CheckCircle2, ArrowUpDown } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -38,6 +39,17 @@ function AdminPanel() {
   const [consultations, setConsultations] = React.useState<any[]>([]);
   const [loadingConsultations, setLoadingConsultations] = React.useState(true);
 
+  const [fabJobs, setFabJobs] = React.useState<any[]>([]);
+  const [loadingFabJobs, setLoadingFabJobs] = React.useState(true);
+
+  const [auditLogs, setAuditLogs] = React.useState<any[]>([]);
+  const [showAuditModal, setShowAuditModal] = React.useState(false);
+  const [loadingAudit, setLoadingAudit] = React.useState(false);
+
+  // Edit Product State
+  const [editingProduct, setEditingProduct] = React.useState<any | null>(null);
+  const [savingEdit, setSavingEdit] = React.useState(false);
+
   // Form State
   const [showAddForm, setShowAddForm] = React.useState(false);
   const [addingProduct, setAddingProduct] = React.useState(false);
@@ -60,16 +72,23 @@ function AdminPanel() {
         setLoadingOrders(true);
         setLoadingApps(true);
         setLoadingConsultations(true);
+        setLoadingFabJobs(true);
 
-        const [userRes, prodRes, appRes] = await Promise.all([
+        const [userRes, prodRes, appRes, consultRes, orderRes, fabRes] = await Promise.all([
           fetch('/api/users'),
           fetch('/api/products'),
-          fetch('/api/applications')
+          fetch('/api/applications'),
+          fetch('/api/consultations'),
+          fetch('/api/orders'),
+          fetch('/api/fabrication'),
         ]);
 
         if (userRes.ok) setUsers(await userRes.json());
         if (prodRes.ok) setInventory(await prodRes.json());
         if (appRes.ok) setApplications(await appRes.json());
+        if (consultRes.ok) setConsultations(await consultRes.json());
+        if (orderRes.ok) setOrders(await orderRes.json());
+        if (fabRes.ok) setFabJobs(await fabRes.json());
         
       } catch (e) {
         console.error("Failed to sync system registry", e);
@@ -79,6 +98,7 @@ function AdminPanel() {
         setLoadingOrders(false);
         setLoadingApps(false);
         setLoadingConsultations(false);
+        setLoadingFabJobs(false);
       }
     };
 
@@ -162,12 +182,90 @@ function AdminPanel() {
     }
   };
 
-  const shipOrder = (id: string) => {
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'shipped' } : o));
+  const shipOrder = async (id: string, newStatus: string) => {
+    try {
+      const res = await fetch(`/api/orders/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
+      }
+    } catch (e) {
+      console.error('Failed to update order', e);
+    }
   };
 
-  const confirmSession = (id: string) => {
-    setConsultations(prev => prev.map(s => s.id === id ? { ...s, status: 'confirmed' } : s));
+  const confirmSession = async (id: string) => {
+    try {
+      const res = await fetch(`/api/consultations/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'confirmed' }),
+      });
+      if (res.ok) {
+        setConsultations(prev => prev.map(s => s.id === id ? { ...s, status: 'confirmed' } : s));
+      }
+    } catch (e) {
+      console.error('Failed to confirm session', e);
+    }
+  };
+
+  const updateFabJob = async (id: string, status: string, progress: number) => {
+    try {
+      const res = await fetch(`/api/fabrication/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, progress }),
+      });
+      if (res.ok) {
+        setFabJobs(prev => prev.map(j => j.id === id ? { ...j, status, progress } : j));
+      }
+    } catch (e) {
+      console.error('Failed to update fab job', e);
+    }
+  };
+
+  const handleEditProduct = async () => {
+    if (!editingProduct) return;
+    setSavingEdit(true);
+    try {
+      const res = await fetch(`/api/products/${editingProduct.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editingProduct.name,
+          sku: editingProduct.sku,
+          price: editingProduct.price,
+          stock: editingProduct.stock,
+          category: editingProduct.category,
+          description: editingProduct.description,
+          tag: editingProduct.tag,
+        }),
+      });
+      if (res.ok) {
+        setInventory(prev => prev.map(p => p.id === editingProduct.id ? { ...p, ...editingProduct } : p));
+        setEditingProduct(null);
+      }
+    } catch (e) {
+      console.error('Failed to update product', e);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const fetchAuditLogs = async () => {
+    setShowAuditModal(true);
+    setLoadingAudit(true);
+    try {
+      const res = await fetch('/api/audit');
+      if (res.ok) setAuditLogs(await res.json());
+    } catch (e) {
+      console.error('Failed to fetch audit logs', e);
+    } finally {
+      setLoadingAudit(false);
+    }
   };
 
   const handleAddProduct = async (e: React.FormEvent) => {
@@ -202,8 +300,8 @@ function AdminPanel() {
 
   // Redirect if not admin or expert
   React.useEffect(() => {
-    const role = (session?.user as any)?.role;
-    if (status === 'unauthenticated' || (status === 'authenticated' && role !== 'admin' && role !== 'expert')) {
+    const role = (session?.user as any)?.role || '';
+    if (status === 'unauthenticated' || (status === 'authenticated' && !role.includes('admin') && !role.includes('expert'))) {
       router.push('/dashboard');
     }
   }, [session, status, router]);
@@ -246,7 +344,7 @@ function AdminPanel() {
                <span className="text-xs font-bold text-white uppercase tracking-tighter">{session?.user?.name || 'Administrator'}</span>
             </div>
             <div className="w-px h-10 bg-white/10 mx-2" />
-            <Button variant="outline" size="sm" className="bg-zinc-800 text-white border-zinc-700">Audit Logs</Button>
+            <Button variant="outline" size="sm" className="bg-zinc-800 text-white border-zinc-700 flex gap-2" onClick={fetchAuditLogs}><ClipboardList className="w-3 h-3" /> Audit Logs</Button>
           </div>
         </div>
 
@@ -365,8 +463,8 @@ function AdminPanel() {
                              <td className="p-4 text-sm font-black text-safety-orange">PHP {item.price.toFixed(2)}</td>
                             <td className="p-4 text-right">
                                <div className="flex gap-2 justify-end">
-                                  <Button variant="outline" size="sm" className="px-2 h-8 min-w-0">Edit</Button>
-                                  <Button variant="ghost" size="sm" className="px-2 h-8 min-w-0 text-red-500" onClick={() => deleteProduct(item.id)}>Delete</Button>
+                                   <Button variant="outline" size="sm" className="px-2 h-8 min-w-0" onClick={() => setEditingProduct({...item})}>Edit</Button>
+                                   <Button variant="ghost" size="sm" className="px-2 h-8 min-w-0 text-red-500" onClick={() => deleteProduct(item.id)}>Delete</Button>
                                </div>
                             </td>
                             </tr>
@@ -395,31 +493,50 @@ function AdminPanel() {
                 ) : orders.length > 0 ? (
                   <div className="overflow-x-auto border border-white/5 rounded-sm bg-black/20">
                      <table className="w-full text-left border-collapse">
-                        {/* ... table content ... */}
                         <thead>
                         <tr className="border-b border-white/10 bg-zinc-900/50">
-                          <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest">Registry ID</th>
-                          <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest">Acquisition</th>
-                          <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest">Valuation</th>
-                          <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest">State</th>
+                          <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest">Order ID</th>
+                          <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest">Customer</th>
+                          <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest">Items</th>
+                          <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest">Total</th>
+                          <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest">Status</th>
                           <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {orders.map((order: any) => (
                           <tr key={order.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                            <td className="p-4 text-xs font-mono text-safety-orange font-black underline cursor-pointer">{order.id}</td>
-                            <td className="p-4 text-sm font-bold text-white uppercase tracking-tighter">{order.customer}</td>
-                             <td className="p-4 text-sm font-black text-white">PHP {order.total.toFixed(2)}</td>
+                            <td className="p-4 text-xs font-mono text-safety-orange font-black">{order.id?.slice(0, 8).toUpperCase()}</td>
                             <td className="p-4">
-                               <Badge variant={order.status === 'shipped' ? 'completed' : 'pending'}>{order.status.toUpperCase()}</Badge>
+                              <div>
+                                <span className="text-sm font-bold text-white uppercase tracking-tighter block">{order.customerName}</span>
+                                <span className="text-[10px] text-zinc-500 font-mono">{order.customerEmail}</span>
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <div className="space-y-1">
+                                {(order.items || []).slice(0, 2).map((item: any, i: number) => (
+                                  <span key={i} className="text-xs text-zinc-400 block">{item.name} x{item.quantity}</span>
+                                ))}
+                                {(order.items || []).length > 2 && <span className="text-[10px] text-zinc-600">+{order.items.length - 2} more</span>}
+                              </div>
+                            </td>
+                            <td className="p-4 text-sm font-black text-white">PHP {(order.total || 0).toFixed(2)}</td>
+                            <td className="p-4">
+                               <Badge variant={order.status === 'delivered' ? 'completed' : order.status === 'shipped' ? 'in-progress' : 'pending'}>{(order.status || 'processing').toUpperCase()}</Badge>
                             </td>
                             <td className="p-4 text-right">
-                               {order.status === 'processing' ? (
-                                 <Button variant="outline" size="sm" className="text-[10px] bg-green-600/10 text-green-500 border-green-500/20" onClick={() => shipOrder(order.id)}>Ship Package</Button>
-                               ) : (
-                                 <Button variant="outline" size="sm" className="text-[10px]" disabled>Receipt Sent</Button>
+                              <div className="flex gap-2 justify-end">
+                               {order.status === 'processing' && (
+                                 <Button variant="outline" size="sm" className="text-[10px] bg-blue-600/10 text-blue-400 border-blue-500/20 flex gap-1" onClick={() => shipOrder(order.id, 'shipped')}><Truck className="w-3 h-3" /> Ship</Button>
                                )}
+                               {order.status === 'shipped' && (
+                                 <Button variant="outline" size="sm" className="text-[10px] bg-green-600/10 text-green-500 border-green-500/20 flex gap-1" onClick={() => shipOrder(order.id, 'delivered')}><CheckCircle2 className="w-3 h-3" /> Delivered</Button>
+                               )}
+                               {order.status === 'delivered' && (
+                                 <Badge variant="completed" className="text-[8px]">COMPLETE</Badge>
+                               )}
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -564,15 +681,63 @@ function AdminPanel() {
               </TabsContent>
 
               {/* Fabrication Management */}
-              <TabsContent value="fabrication" className="mt-0">
-                <div className="py-20 flex flex-col items-center border border-dashed border-white/10 rounded-sm bg-black/10">
-                   <div className="w-16 h-16 bg-zinc-900 border border-white/10 rounded-sm flex items-center justify-center mb-6 rotate-45">
-                       <Hammer className="w-8 h-8 text-zinc-700 -rotate-45" />
-                   </div>
-                   <h3 className="text-3xl font-black uppercase text-white tracking-tighter text-center">Manufacturing Control</h3>
-                   <p className="text-zinc-500 mt-4 max-w-md text-center font-medium uppercase text-xs tracking-widest">Active Fabrication Jobs and System Status Monitoring.</p>
-                   <Button className="mt-8 px-10 h-14 uppercase tracking-widest text-xs font-black bg-zinc-800 border border-white/10 hover:bg-safety-orange">Launch Fab Console</Button>
+              <TabsContent value="fabrication" className="space-y-8 mt-0">
+                <div className="mb-10">
+                   <h3 className="text-2xl font-black uppercase text-white tracking-tighter">Manufacturing Control</h3>
+                   <p className="text-zinc-500 text-xs font-medium uppercase tracking-widest mt-1">Active fabrication jobs and system status</p>
                 </div>
+
+                {loadingFabJobs ? (
+                  <div className="py-20 flex justify-center"><Activity className="w-8 h-8 text-safety-orange animate-spin" /></div>
+                ) : fabJobs.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {fabJobs.map((job: any) => (
+                      <Card key={job.id} className="border border-white/5 bg-black/40">
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <Badge variant="new" className="mb-2 uppercase text-[8px]">{job.id?.slice(0, 8)}</Badge>
+                            <h4 className="text-lg font-black text-white uppercase tracking-tight">{job.name}</h4>
+                            <p className="text-xs text-zinc-500 font-medium mt-1">Client: {job.customerName}</p>
+                            {job.files && <p className="text-[10px] text-zinc-600 font-mono mt-1">{job.files.join(', ')}</p>}
+                          </div>
+                          <Badge variant={job.status === 'completed' ? 'completed' : job.status === 'in-progress' ? 'in-progress' : 'pending'}>
+                            {(job.status || 'queued').toUpperCase()}
+                          </Badge>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="mb-4">
+                          <div className="flex justify-between text-[10px] font-black text-zinc-500 uppercase mb-1">
+                            <span>Progress</span>
+                            <span className="text-safety-orange">{job.progress || 0}%</span>
+                          </div>
+                          <div className="h-3 bg-zinc-900 rounded-sm border border-white/5 overflow-hidden">
+                            <div className="h-full bg-safety-orange transition-all" style={{ width: `${job.progress || 0}%` }} />
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2 flex-wrap">
+                          {job.status !== 'completed' && (
+                            <>
+                              <Button size="sm" className="text-[9px] uppercase font-black bg-blue-600 hover:bg-blue-700 h-7 px-3" onClick={() => updateFabJob(job.id, 'reviewing', 25)}>Review</Button>
+                              <Button size="sm" className="text-[9px] uppercase font-black bg-safety-orange hover:bg-safety-orange/80 h-7 px-3" onClick={() => updateFabJob(job.id, 'in-progress', 60)}>In Progress</Button>
+                              <Button size="sm" className="text-[9px] uppercase font-black bg-green-600 hover:bg-green-700 h-7 px-3" onClick={() => updateFabJob(job.id, 'completed', 100)}>Complete</Button>
+                            </>
+                          )}
+                          {job.status === 'completed' && (
+                            <Badge variant="completed" className="text-[9px]">JOB FULFILLED</Badge>
+                          )}
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyTerminalState 
+                    icon={Hammer} 
+                    title="No Active Jobs" 
+                    description="No fabrication requests pending. Jobs will appear here when customers submit quote requests." 
+                  />
+                )}
               </TabsContent>
             </>
           )}
@@ -584,29 +749,32 @@ function AdminPanel() {
                <p className="text-zinc-500 text-xs font-medium uppercase tracking-widest mt-1">Manage technical consultations and design reviews</p>
             </div>
 
-            {consultations.length > 0 ? (
+             {loadingConsultations ? (
+              <div className="py-20 flex justify-center"><Activity className="w-8 h-8 text-safety-orange animate-spin" /></div>
+            ) : consultations.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {consultations.map(session => (
-                    <Card key={session.id} className="border border-white/5 bg-black/40">
+                  {consultations.map((consult: any) => (
+                    <Card key={consult.id} className="border border-white/5 bg-black/40">
                       <div className="flex justify-between items-start mb-6">
                         <div>
                             <Badge variant="new" className="mb-2 uppercase">Session Protocol</Badge>
-                            <h4 className="text-xl font-black text-white uppercase tracking-tight">{session.type}</h4>
-                            <p className="text-xs text-zinc-500 font-medium">Client: {session.client}</p>
+                            <h4 className="text-xl font-black text-white uppercase tracking-tight">{consult.expertName}</h4>
+                            <p className="text-xs text-zinc-500 font-medium">Client: {consult.clientName || consult.clientEmail}</p>
+                            <p className="text-[10px] text-zinc-600 font-mono mt-1">{consult.expertTitle}</p>
                         </div>
-                        <Badge variant={session.status === 'confirmed' ? 'completed' : 'pending'}>
-                          {session.status.toUpperCase()}
+                        <Badge variant={consult.status === 'confirmed' ? 'completed' : 'pending'}>
+                          {(consult.status || 'pending').toUpperCase()}
                         </Badge>
                       </div>
 
                       <div className="flex items-center gap-4 p-4 bg-zinc-900/50 rounded-sm mb-6 border border-white/5">
                           <Activity className="w-4 h-4 text-safety-orange" />
-                          <span className="text-xs font-mono text-zinc-400 capitalize">{session.date}</span>
+                          <span className="text-xs font-mono text-zinc-400">{consult.slot || 'TBD'} — {consult.expertPrice}</span>
                       </div>
 
                       <div className="flex gap-4">
-                          {session.status === 'pending' ? (
-                            <Button className="flex-grow bg-green-600 hover:bg-green-700 uppercase font-black text-[10px]" onClick={() => confirmSession(session.id)}>Accept Session</Button>
+                          {consult.status === 'pending' ? (
+                            <Button className="flex-grow bg-green-600 hover:bg-green-700 uppercase font-black text-[10px]" onClick={() => confirmSession(consult.id)}>Accept Session</Button>
                           ) : (
                             <Button className="flex-grow bg-safety-orange hover:bg-safety-orange/80 uppercase font-black text-[10px]">Prepare Files</Button>
                           )}
@@ -625,6 +793,112 @@ function AdminPanel() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Edit Product Modal */}
+      <AnimatePresence>
+        {editingProduct && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !savingEdit && setEditingProduct(null)}>
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-white/10 rounded-sm shadow-2xl max-w-lg w-full overflow-hidden">
+              <div className="bg-red-600 p-1">
+                <div className="bg-zinc-900 p-6 flex items-center justify-between">
+                  <h3 className="text-xl font-black text-white uppercase tracking-tighter">Edit Product</h3>
+                  <button onClick={() => setEditingProduct(null)} className="text-zinc-500 hover:text-white"><X className="w-5 h-5" /></button>
+                </div>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Name</label>
+                    <Input className="bg-zinc-800 border-zinc-700" value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">SKU</label>
+                    <Input className="bg-zinc-800 border-zinc-700" value={editingProduct.sku} onChange={e => setEditingProduct({...editingProduct, sku: e.target.value})} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Price (PHP)</label>
+                    <Input type="number" step="0.01" className="bg-zinc-800 border-zinc-700" value={editingProduct.price || ''} onChange={e => setEditingProduct({...editingProduct, price: parseFloat(e.target.value) || 0})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Stock</label>
+                    <Input type="number" className="bg-zinc-800 border-zinc-700" value={editingProduct.stock || ''} onChange={e => setEditingProduct({...editingProduct, stock: parseInt(e.target.value) || 0})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Category</label>
+                    <select className="flex h-10 w-full rounded-sm border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-safety-orange appearance-none" value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})}>
+                      {['Hardware', 'Robotics', 'Motion', 'Power', 'Sensors', 'Electronics'].map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Tag</label>
+                  <Input className="bg-zinc-800 border-zinc-700" value={editingProduct.tag || ''} onChange={e => setEditingProduct({...editingProduct, tag: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Description</label>
+                  <Textarea className="bg-zinc-800 border-zinc-700 min-h-[80px]" value={editingProduct.description || ''} onChange={e => setEditingProduct({...editingProduct, description: e.target.value})} />
+                </div>
+              </div>
+              <div className="p-6 pt-0 flex gap-4">
+                <Button variant="outline" className="flex-1" onClick={() => setEditingProduct(null)}>Cancel</Button>
+                <Button className="flex-1 bg-red-600 hover:bg-red-700" onClick={handleEditProduct} disabled={savingEdit}>
+                  {savingEdit ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Audit Logs Modal */}
+      <AnimatePresence>
+        {showAuditModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowAuditModal(false)}>
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-white/10 rounded-sm shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+              <div className="bg-safety-orange p-1">
+                <div className="bg-zinc-900 p-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-black text-white uppercase tracking-tighter">System Audit Trail</h3>
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">Recent administrative actions</p>
+                  </div>
+                  <button onClick={() => setShowAuditModal(false)} className="text-zinc-500 hover:text-white"><X className="w-5 h-5" /></button>
+                </div>
+              </div>
+              <div className="p-6 overflow-y-auto flex-grow custom-scrollbar">
+                {loadingAudit ? (
+                  <div className="py-12 flex justify-center"><Activity className="w-8 h-8 text-safety-orange animate-spin" /></div>
+                ) : auditLogs.length > 0 ? (
+                  <div className="space-y-3">
+                    {auditLogs.map((log: any) => (
+                      <div key={log.id} className="flex gap-4 p-3 bg-black/30 rounded-sm border border-white/5">
+                        <div className="w-8 h-8 bg-zinc-800 rounded-sm flex items-center justify-center shrink-0 border border-white/5">
+                          <Activity className="w-4 h-4 text-safety-orange" />
+                        </div>
+                        <div className="flex-grow min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant="new" className="text-[7px] px-1 h-4 shrink-0">{log.action}</Badge>
+                            <span className="text-[10px] text-zinc-600 truncate">{log.createdAt ? new Date(log.createdAt).toLocaleString() : ''}</span>
+                          </div>
+                          <p className="text-xs text-zinc-400">{log.details}</p>
+                          <p className="text-[10px] text-zinc-600 font-mono mt-1">by {log.actor}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-12 text-center">
+                    <ClipboardList className="w-10 h-10 text-zinc-700 mx-auto mb-4" />
+                    <p className="text-sm text-zinc-500 font-bold uppercase">No audit entries yet</p>
+                    <p className="text-xs text-zinc-600 mt-1">Actions will be logged as they occur.</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </PageShell>
   );
 }

@@ -1,11 +1,11 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
-import { PenTool } from 'lucide-react';
+import { PenTool, Activity } from 'lucide-react';
 
 const LoadingGauge = ({ progress, status }: { progress: number; status: string }) => {
   return (
@@ -14,18 +14,13 @@ const LoadingGauge = ({ progress, status }: { progress: number; status: string }
         <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">SYSTEM STATE: {status}</span>
         <span className="text-[10px] font-mono leading-none text-safety-orange">{progress}%</span>
       </div>
-      {/* Vintage CNC Gauge Frame */}
       <div className="h-6 bg-zinc-900 border-2 border-zinc-700 p-1 relative overflow-hidden shadow-inner">
-        {/* CRT Scanline Effect */}
         <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,.25)_50%),linear-gradient(90deg,rgba(255,0,0,.06),rgba(0,255,0,.02),rgba(0,0,118,.06))] bg-[length:100%_2px,3px_100%] z-10" />
-        
-        {/* Gauge Blocks */}
         <div className="flex gap-1 h-full w-full">
           {Array.from({ length: 20 }).map((_, i) => {
             const blockThreshold = (i + 1) * 5;
             const isActive = progress >= blockThreshold;
             const isLatest = progress >= blockThreshold && progress < blockThreshold + 5;
-            
             return (
               <motion.div 
                 key={i}
@@ -50,11 +45,57 @@ interface ServiceJob {
   name: string;
   progress: number;
   status: string;
-  date: string;
+  files?: string[];
+  customerName?: string;
+  createdAt?: string;
 }
 
-export const ServiceQueue = ({ orders = [] }: { orders?: ServiceJob[] }) => {
-  if (orders.length === 0) {
+function timeAgo(dateStr?: string): string {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const hrs = Math.floor(diff / 3600000);
+  if (hrs < 1) return 'Less than an hour ago';
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+export const ServiceQueue = ({ orders, autoFetch = false }: { orders?: ServiceJob[], autoFetch?: boolean }) => {
+  const [jobs, setJobs] = useState<ServiceJob[]>(orders || []);
+  const [loading, setLoading] = useState(autoFetch);
+
+  useEffect(() => {
+    if (!autoFetch) return;
+    const fetchJobs = async () => {
+      try {
+        const res = await fetch('/api/fabrication');
+        if (res.ok) {
+          const data = await res.json();
+          setJobs(data);
+        }
+      } catch (e) {
+        console.error('Failed to fetch fab jobs', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchJobs();
+  }, [autoFetch]);
+
+  // If orders prop is passed, use it directly
+  useEffect(() => {
+    if (orders) setJobs(orders);
+  }, [orders]);
+
+  if (loading) {
+    return (
+      <div className="py-20 flex justify-center">
+        <Activity className="w-8 h-8 text-safety-orange animate-spin" />
+      </div>
+    );
+  }
+
+  if (jobs.length === 0) {
     return (
       <div className="py-20 border-2 border-dashed border-white/5 rounded-sm flex flex-col items-center justify-center text-center bg-black/10">
         <div className="w-16 h-16 bg-zinc-900 border border-white/10 rounded-sm flex items-center justify-center mb-6 rotate-45 group">
@@ -74,31 +115,33 @@ export const ServiceQueue = ({ orders = [] }: { orders?: ServiceJob[] }) => {
 
   return (
     <div className="grid grid-cols-1 gap-6">
-      {orders.map((order) => (
-        <Card key={order.id} className="relative overflow-hidden group">
+      {jobs.map((job) => (
+        <Card key={job.id} className="relative overflow-hidden group">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex-grow">
               <div className="flex items-center gap-3 mb-2">
-                <Badge variant={order.status === 'Completed' ? 'completed' : 'in-progress'}>
-                  {order.id}
+                <Badge variant={job.status === 'completed' ? 'completed' : job.status === 'in-progress' ? 'in-progress' : 'pending'}>
+                  {job.id.slice(0, 8).toUpperCase()}
                 </Badge>
-                <span className="text-zinc-400 text-xs font-bold uppercase">{order.date}</span>
+                <span className="text-zinc-400 text-xs font-bold uppercase">{timeAgo(job.createdAt)}</span>
               </div>
-              <h4 className="text-xl font-black text-esd-dark uppercase mb-6">{order.name}</h4>
+              <h4 className="text-xl font-black text-esd-dark uppercase mb-2">{job.name}</h4>
+              {job.files && job.files.length > 0 && (
+                <p className="text-xs text-zinc-500 font-mono mb-4">{job.files.join(', ')}</p>
+              )}
+              {job.customerName && (
+                <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mb-4">Client: {job.customerName}</p>
+              )}
               
-              <LoadingGauge progress={order.progress} status={order.status} />
+              <LoadingGauge progress={job.progress} status={job.status} />
             </div>
 
             <div className="flex flex-col gap-2 shrink-0 md:text-right">
               <span className="text-[10px] font-black uppercase text-zinc-400">Target Dept</span>
               <span className="text-sm font-bold text-esd-dark">CNC MACHINING CENTER</span>
-              <button className="text-xs font-handwriting text-safety-orange hover:underline mt-2">
-                Download Technical Report →
-              </button>
             </div>
           </div>
           
-          {/* Shadow mask decorative element */}
           <div className="absolute top-0 right-0 w-24 h-full bg-gradient-to-l from-black/[0.02] to-transparent pointer-events-none" />
         </Card>
       ))}

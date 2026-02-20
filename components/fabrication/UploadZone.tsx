@@ -84,16 +84,35 @@ export const UploadZone = () => {
 
     setSubmitting(true);
 
-    // Simulate API request — in production this would upload to storage + create a Firestore document
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      const fileNames = files.map(f => f.name);
+      const jobName = fileNames.length === 1 
+        ? fileNames[0].replace(/\.[^/.]+$/, '') 
+        : `Batch: ${fileNames.length} files`;
 
-    showToast(
-      `Quote request submitted for ${files.length} file${files.length > 1 ? 's' : ''}. Our engineering team will review within 2-4 hours.`,
-      'success'
-    );
+      const res = await fetch('/api/fabrication', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: jobName,
+          files: fileNames,
+        }),
+      });
 
-    setFiles([]);
-    setSubmitting(false);
+      if (res.ok) {
+        showToast(
+          `Quote request submitted for ${files.length} file${files.length > 1 ? 's' : ''}. Our engineering team will review within 2-4 hours.`,
+          'success'
+        );
+        setFiles([]);
+      } else {
+        showToast('Failed to submit request. Please sign in and try again.', 'error');
+      }
+    } catch (e) {
+      showToast('Network error. Please try again.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

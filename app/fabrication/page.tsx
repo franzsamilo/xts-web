@@ -70,7 +70,7 @@ export default function FabricationPage() {
 
           <TabsContent value="queue">
             <div className="max-w-4xl">
-              <ServiceQueue />
+              <ServiceQueue autoFetch={true} />
             </div>
           </TabsContent>
         </Tabs>
