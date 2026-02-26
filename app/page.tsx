@@ -101,9 +101,9 @@ export default function Home() {
                     Browse Shop <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </Link>
-                <Link href="/fabrication">
+                <Link href="/services">
                   <Button variant="outline" size="lg">
-                    Request Fabrication
+                    Request Services
                   </Button>
                 </Link>
               </div>
@@ -215,7 +215,7 @@ export default function Home() {
                   <p className="text-zinc-600 mb-8 leading-relaxed">
                     {s.desc}
                   </p>
-                  <Link href="/fabrication">
+                  <Link href="/services">
                     <Button variant="primary" className="w-full">
                       Upload Files
                     </Button>

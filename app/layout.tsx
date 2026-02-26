@@ -22,6 +22,7 @@ export const metadata: Metadata = {
 };
 
 import { SessionProvider } from "@/components/providers/SessionProvider";
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { CartProvider } from "@/lib/cart-context";
 
 export default function RootLayout({
@@ -30,15 +31,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="dark">
       <body
         className={`${inter.variable} ${architectsDaughter.variable} antialiased`}
       >
-        <SessionProvider>
-          <CartProvider>
-            {children}
-          </CartProvider>
-        </SessionProvider>
+        <ThemeProvider>
+          <SessionProvider>
+            <CartProvider>
+              {children}
+            </CartProvider>
+          </SessionProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

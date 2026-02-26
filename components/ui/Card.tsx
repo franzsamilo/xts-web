@@ -16,7 +16,7 @@ export const Card = ({ children, className, annotation, hoverEffect = true, onCl
   return (
     <motion.div
       onClick={onClick}
-      whileHover={hoverEffect ? { y: -5, rotate: 0.5 } : {}}
+      whileHover={hoverEffect ? { y: -4, scale: 1.02 } : {}}
       className={cn(
         'paper-card paper-texture p-6 rounded-sm relative',
         className,

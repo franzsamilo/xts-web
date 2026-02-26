@@ -104,7 +104,7 @@ export const ServiceQueue = ({ orders, autoFetch = false }: { orders?: ServiceJo
         <h4 className="text-xl font-black text-white uppercase tracking-tighter mb-2">Queue Is Nominal</h4>
         <p className="text-sm text-zinc-500 max-w-sm mb-8 font-medium">No fabrication requests are currently being processed by our facility.</p>
         <button 
-           onClick={() => window.location.href = '/fabrication'}
+           onClick={() => window.location.href = '/services'}
            className="px-8 py-3 bg-zinc-800 text-white text-xs font-black uppercase tracking-widest hover:bg-safety-orange transition-all border border-white/10"
         >
           Initialize New Request
