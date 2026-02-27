@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 
 interface CartItem {
   id: string;
@@ -10,6 +11,7 @@ interface CartItem {
   category?: string;
   sku?: string;
   tag?: string;
+  imageUrl?: string;
 }
 
 interface CartContextType {
@@ -34,29 +36,43 @@ const CartContext = createContext<CartContextType>({
 
 export const useCart = () => useContext(CartContext);
 
-const STORAGE_KEY = 'xts-cart';
+const STORAGE_PREFIX = 'xts-cart-';
 
 export const CartProvider = ({ children }: { children: React.ReactNode }) => {
+  const { data: session } = useSession();
   const [items, setItems] = useState<CartItem[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [currentKey, setCurrentKey] = useState<string | null>(null);
 
-  // Load from localStorage
+  // Derive per-user storage key from session email
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        setItems(JSON.parse(saved));
-      }
-    } catch {}
+    if (session?.user?.email) {
+      const key = STORAGE_PREFIX + session.user.email;
+      setCurrentKey(key);
+      try {
+        const saved = localStorage.getItem(key);
+        if (saved) setItems(JSON.parse(saved));
+        else setItems([]);
+      } catch {}
+    } else {
+      // Not logged in — use a guest key
+      const guestKey = STORAGE_PREFIX + 'guest';
+      setCurrentKey(guestKey);
+      try {
+        const saved = localStorage.getItem(guestKey);
+        if (saved) setItems(JSON.parse(saved));
+        else setItems([]);
+      } catch {}
+    }
     setMounted(true);
-  }, []);
+  }, [session?.user?.email]);
 
   // Save to localStorage whenever items change
   useEffect(() => {
-    if (mounted) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    if (mounted && currentKey) {
+      localStorage.setItem(currentKey, JSON.stringify(items));
     }
-  }, [items, mounted]);
+  }, [items, mounted, currentKey]);
 
   const addToCart = useCallback((item: Omit<CartItem, 'quantity'>) => {
     setItems(prev => {

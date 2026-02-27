@@ -53,6 +53,7 @@ export default function ShopPage() {
       category: product.category,
       sku: product.sku,
       tag: product.tag,
+      imageUrl: product.imageUrls?.[0] || '',
     });
     setAddedIds(prev => new Set(prev).add(product.id));
     setTimeout(() => {

@@ -9,17 +9,19 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useCart } from '@/lib/cart-context';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { Minus, Plus, X, ShoppingCart, Package, ArrowRight, Trash2, CheckCircle2, Activity } from 'lucide-react';
 
 export default function CartPage() {
   const { items, removeFromCart, updateQuantity, clearCart, cartCount, cartTotal } = useCart();
   const { data: session } = useSession();
+  const router = useRouter();
   const [checkingOut, setCheckingOut] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState<string | null>(null);
 
   const handleCheckout = async () => {
     if (!session) {
-      alert('Please sign in to place an order.');
+      router.push('/login');
       return;
     }
 
@@ -128,15 +130,23 @@ export default function CartPage() {
                 <motion.div key={item.id} layout initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20, height: 0 }} transition={{ duration: 0.2 }}>
                   <Card className="relative group">
                     <div className="flex flex-col sm:flex-row gap-6">
-                      <div className="w-24 h-24 bg-zinc-200 rounded-sm flex items-center justify-center shrink-0">
-                        <Package className="w-10 h-10 text-zinc-400" />
-                      </div>
+                      <Link href={`/shop/${item.id}`} className="shrink-0">
+                        <div className="w-24 h-24 rounded-sm overflow-hidden bg-zinc-200 flex items-center justify-center">
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <Package className="w-10 h-10 text-zinc-400" />
+                          )}
+                        </div>
+                      </Link>
                       <div className="flex-grow flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
                           <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block mb-1">
                             {item.category || 'Hardware'} {item.sku ? `// ${item.sku}` : ''}
                           </span>
-                          <h4 className="text-lg font-black text-esd-dark uppercase tracking-tight mb-1">{item.name}</h4>
+                          <Link href={`/shop/${item.id}`}>
+                            <h4 className="text-lg font-black text-esd-dark uppercase tracking-tight mb-1 hover:text-safety-orange transition-colors">{item.name}</h4>
+                          </Link>
                           <span className="text-sm font-black text-safety-orange">PHP {item.price.toFixed(2)}</span>
                         </div>
                         <div className="flex items-center gap-6">

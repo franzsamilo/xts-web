@@ -215,6 +215,7 @@ function ServicesContent() {
                       <Input
                         type={field.type}
                         placeholder={field.placeholder}
+                        {...(field.type === 'number' ? { min: '0' } : {})}
                         className="h-10 bg-[var(--bg-input)] border-[var(--border-primary)] text-[var(--text-on-input)] text-sm"
                         value={formData[field.name] || ''}
                         onChange={e => setFormData({ ...formData, [field.name]: e.target.value })}

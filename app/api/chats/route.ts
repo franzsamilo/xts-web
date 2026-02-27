@@ -1,15 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getChatsByUser, createChat, findExistingChat, addMessage } from '@/lib/chat';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    const chats = await getChatsByUser(session.user.email);
+    // Fetch user's own chats
+    let chats = await getChatsByUser(session.user.email);
+
+    // If admin or seller, also fetch shared admin inbox (admin@xts.com)
+    const role = (session.user as any)?.role || '';
+    if (role.includes('admin') || role.includes('seller')) {
+      const adminChats = await getChatsByUser('admin@xts.com');
+      const existingIds = new Set(chats.map((c: any) => c.id));
+      for (const ac of adminChats) {
+        if (!existingIds.has(ac.id)) chats.push(ac);
+      }
+    }
+
     return NextResponse.json(chats);
   } catch (error) {
     console.error('Error fetching chats:', error);
@@ -19,7 +32,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

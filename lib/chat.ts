@@ -133,3 +133,13 @@ export async function findExistingChat(
     return null;
   }
 }
+
+export async function deleteChat(chatId: string): Promise<void> {
+  // Delete all messages in the subcollection first
+  const messagesSnap = await adminDb.collection('chats').doc(chatId).collection('messages').get();
+  const batch = adminDb.batch();
+  messagesSnap.docs.forEach(doc => batch.delete(doc.ref));
+  await batch.commit();
+  // Delete the chat document
+  await adminDb.collection('chats').doc(chatId).delete();
+}

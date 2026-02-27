@@ -53,6 +53,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       category: product.category,
       sku: product.sku,
       tag: product.tag,
+      imageUrl: product.imageUrls?.[0] || '',
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
@@ -69,12 +70,16 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       return;
     }
     try {
+      const userName = session.user.name || 'A customer';
+      const productPrice = parseFloat(product.price).toLocaleString('en-PH', { minimumFractionDigits: 2 });
+      const initialMessage = `Hi! I'm interested in this product:\n\n📦 ${product.name}\n🏷️ SKU: ${product.sku}\n💰 Price: ₱${productPrice}\n📂 Category: ${product.category}\n\nCould you help me with more details?`;
+
       const res = await fetch('/api/chats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           recipientId: 'admin@xts.com',
-          recipientName: 'XTS Seller',
+          recipientName: 'XTS Store',
           type: 'product',
           productRef: {
             id: product.id,
@@ -82,12 +87,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             price: parseFloat(product.price),
             imageUrl: product.imageUrls?.[0] || '',
           },
-          initialMessage: `Hi, I'm interested in: ${product.name} (${product.sku})`,
+          initialMessage,
         }),
       });
       if (res.ok) {
-        const chat = await res.json();
-        router.push(`/chat`);
+        router.push('/chat');
       }
     } catch (e) {
       console.error('Failed to start chat', e);

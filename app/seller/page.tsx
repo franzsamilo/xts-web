@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { Package, ShoppingCart, BarChart3, MessageCircle, Settings, Plus, Edit, Trash2, X, Activity, Upload, Check, Image as ImageIcon, Star } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
@@ -163,11 +164,13 @@ export default function SellerDashboard() {
     }
   };
 
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; productId: string | null }>({ open: false, productId: null });
+
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this product?')) return;
     try {
       await fetch(`/api/products/${id}`, { method: 'DELETE' });
       fetchData();
+      setDeleteConfirm({ open: false, productId: null });
     } catch (e) {
       console.error('Failed to delete', e);
     }
@@ -253,12 +256,12 @@ export default function SellerDashboard() {
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest">Price (PHP)</label>
-                          <Input type="number" placeholder="0.00" className="h-10 text-sm" value={formData.price}
+                          <Input type="number" placeholder="0.00" min="0" className="h-10 text-sm" value={formData.price}
                             onChange={e => setFormData({ ...formData, price: e.target.value })} />
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest">Stock</label>
-                          <Input type="number" placeholder="0" className="h-10 text-sm" value={formData.stock}
+                          <Input type="number" placeholder="0" min="0" className="h-10 text-sm" value={formData.stock}
                             onChange={e => setFormData({ ...formData, stock: e.target.value })} />
                         </div>
                         <div className="space-y-1.5">
@@ -268,7 +271,7 @@ export default function SellerDashboard() {
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest">Total Sold</label>
-                          <Input type="number" placeholder="0" className="h-10 text-sm" value={formData.totalSold}
+                          <Input type="number" placeholder="0" min="0" className="h-10 text-sm" value={formData.totalSold}
                             onChange={e => setFormData({ ...formData, totalSold: e.target.value })} />
                         </div>
                       </div>
@@ -276,14 +279,14 @@ export default function SellerDashboard() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest">Category</label>
-                          <select className="flex h-10 w-full rounded-sm border border-[var(--border-primary)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-on-card)] appearance-none"
+                          <select className="flex h-10 w-full rounded-sm border border-[var(--border-primary)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-on-input)] appearance-none"
                             value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}>
                             {['Components', 'Modules', 'Sensors', 'Tools', 'Kits', 'Accessories'].map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest">Tag</label>
-                          <select className="flex h-10 w-full rounded-sm border border-[var(--border-primary)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-on-card)] appearance-none"
+                          <select className="flex h-10 w-full rounded-sm border border-[var(--border-primary)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-on-input)] appearance-none"
                             value={formData.tag} onChange={e => setFormData({ ...formData, tag: e.target.value })}>
                             {['New', 'Best Seller', 'Sale', 'Featured', 'Limited'].map(t => <option key={t} value={t}>{t}</option>)}
                           </select>
@@ -294,6 +297,27 @@ export default function SellerDashboard() {
                         <label className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest">Description</label>
                         <Textarea placeholder="Product description..." className="min-h-[80px] text-sm" value={formData.description}
                           onChange={e => setFormData({ ...formData, description: e.target.value })} />
+                      </div>
+
+                      {/* Specifications */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest">Specifications</label>
+                          <Button size="sm" variant="outline" className="text-[10px] h-7 px-2" onClick={addSpecField}>
+                            <Plus className="w-3 h-3 mr-1" /> Add Spec
+                          </Button>
+                        </div>
+                        {specs.map((spec, i) => (
+                          <div key={i} className="flex gap-2">
+                            <Input placeholder="Key (e.g. Voltage)" className="h-9 text-xs flex-1"
+                              value={spec.key} onChange={e => updateSpec(i, 'key', e.target.value)} />
+                            <Input placeholder="Value (e.g. 5V)" className="h-9 text-xs flex-1"
+                              value={spec.value} onChange={e => updateSpec(i, 'value', e.target.value)} />
+                            <button onClick={() => removeSpecField(i)} className="text-red-500 hover:text-red-400 px-1">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
                       </div>
 
                       {/* Image Upload */}
@@ -322,27 +346,6 @@ export default function SellerDashboard() {
                             <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageSelect} />
                           </label>
                         </div>
-                      </div>
-
-                      {/* Specifications */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest">Specifications</label>
-                          <Button size="sm" variant="outline" className="text-[10px] h-7 px-2" onClick={addSpecField}>
-                            <Plus className="w-3 h-3 mr-1" /> Add Spec
-                          </Button>
-                        </div>
-                        {specs.map((spec, i) => (
-                          <div key={i} className="flex gap-2">
-                            <Input placeholder="Key (e.g. Voltage)" className="h-9 text-xs flex-1"
-                              value={spec.key} onChange={e => updateSpec(i, 'key', e.target.value)} />
-                            <Input placeholder="Value (e.g. 5V)" className="h-9 text-xs flex-1"
-                              value={spec.value} onChange={e => updateSpec(i, 'value', e.target.value)} />
-                            <button onClick={() => removeSpecField(i)} className="text-red-500 hover:text-red-400 px-1">
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
                       </div>
 
                       <div className="flex gap-3 pt-2">
@@ -383,7 +386,7 @@ export default function SellerDashboard() {
                       <button onClick={() => startEdit(product)} className="p-1.5 text-[var(--text-muted)] hover:text-safety-orange transition-colors">
                         <Edit className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleDelete(product.id)} className="p-1.5 text-[var(--text-muted)] hover:text-red-500 transition-colors">
+                      <button onClick={() => setDeleteConfirm({ open: true, productId: product.id })} className="p-1.5 text-[var(--text-muted)] hover:text-red-500 transition-colors">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -516,6 +519,16 @@ export default function SellerDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+      <ConfirmModal
+        open={deleteConfirm.open}
+        title="Delete Product"
+        message="Are you sure you want to delete this product? This action cannot be undone."
+        variant="danger"
+        confirmLabel="Delete"
+        cancelLabel="Keep It"
+        onConfirm={() => deleteConfirm.productId && handleDelete(deleteConfirm.productId)}
+        onCancel={() => setDeleteConfirm({ open: false, productId: null })}
+      />
     </PageShell>
   );
 }
