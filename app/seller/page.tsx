@@ -416,14 +416,77 @@ export default function SellerDashboard() {
                       <h4 className="text-sm font-bold text-[var(--text-on-card)]">{order.customerName}</h4>
                       <p className="text-xs text-[var(--text-muted)]">{order.items?.length || 0} items · ₱{order.total?.toLocaleString()}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="flex flex-col items-end gap-2">
                       <Badge variant={
                         order.status === 'completed' ? 'completed' :
                         order.status === 'shipped' || order.status === 'delivered' ? 'in-progress' :
                         order.status === 'processing' ? 'new' : 'pending'
                       }>{order.status}</Badge>
+
+                      {/* Status Update Dropdown */}
+                      <select
+                        className="text-xs rounded-sm border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-on-input)] px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-safety-orange appearance-none cursor-pointer"
+                        value={order.status}
+                        onChange={async (e) => {
+                          const newStatus = e.target.value;
+                          try {
+                            const res = await fetch(`/api/orders/${order.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ status: newStatus }),
+                            });
+                            if (res.ok) {
+                              fetchData();
+                            }
+                          } catch (err) {
+                            console.error('Failed to update order status', err);
+                          }
+                        }}
+                      >
+                        {['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'completed'].map(phase => (
+                          <option key={phase} value={phase}>
+                            → {phase.charAt(0).toUpperCase() + phase.slice(1)}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
+
+                  {/* Status Phase Bar */}
+                  <div className="mt-4 flex items-center gap-1">
+                    {['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'completed'].map((phase, i) => {
+                      const phases = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'completed'];
+                      const currentIdx = phases.indexOf(order.status);
+                      const isActive = i <= currentIdx;
+                      return (
+                        <div key={phase} className="flex-1 flex flex-col items-center gap-1">
+                          <div className={`h-1.5 w-full rounded-full transition-colors ${isActive ? 'bg-safety-orange' : 'bg-[var(--border-primary)]'}`} />
+                          <span className={`text-[8px] font-bold uppercase tracking-wider ${isActive ? 'text-safety-orange' : 'text-[var(--text-muted)]'}`}>
+                            {phase.slice(0, 4)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Status History */}
+                  {order.statusHistory && order.statusHistory.length > 0 && (
+                    <details className="mt-3 pt-3 border-t border-[var(--border-secondary)]">
+                      <summary className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest cursor-pointer hover:text-[var(--text-secondary)] transition-colors">
+                        Status History ({order.statusHistory.length})
+                      </summary>
+                      <div className="mt-2 space-y-1.5">
+                        {order.statusHistory.map((h: any, i: number) => (
+                          <div key={i} className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
+                            <span className="font-bold text-[var(--text-secondary)] uppercase">{h.status}</span>
+                            <span>—</span>
+                            <span>{h.updatedBy}</span>
+                            <span className="ml-auto font-mono">{new Date(h.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
                 </Card>
               ))}
             </div>

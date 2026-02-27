@@ -204,7 +204,7 @@ function ServicesContent() {
                     <label className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest">{field.label}</label>
                     {field.type === 'select' ? (
                       <select
-                        className="flex h-10 w-full rounded-sm border border-[var(--border-primary)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-on-card)] focus:outline-none focus:ring-1 focus:ring-safety-orange appearance-none"
+                        className="flex h-10 w-full rounded-sm border border-[var(--border-primary)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-on-input)] focus:outline-none focus:ring-1 focus:ring-safety-orange appearance-none"
                         value={formData[field.name] || ''}
                         onChange={e => setFormData({ ...formData, [field.name]: e.target.value })}
                       >
@@ -215,7 +215,7 @@ function ServicesContent() {
                       <Input
                         type={field.type}
                         placeholder={field.placeholder}
-                        className="h-10 bg-[var(--bg-input)] border-[var(--border-primary)] text-[var(--text-on-card)] text-sm"
+                        className="h-10 bg-[var(--bg-input)] border-[var(--border-primary)] text-[var(--text-on-input)] text-sm"
                         value={formData[field.name] || ''}
                         onChange={e => setFormData({ ...formData, [field.name]: e.target.value })}
                       />
@@ -245,7 +245,7 @@ function ServicesContent() {
                   {files.length > 0 && (
                     <div className="mt-3 space-y-1">
                       {files.map((f, i) => (
-                        <div key={i} className="text-xs text-[var(--text-secondary)] flex items-center gap-2 justify-center">
+                        <div key={i} className="text-xs text-[var(--text-on-input)] flex items-center gap-2 justify-center">
                           <span>{f.name}</span>
                           <button onClick={() => setFiles(files.filter((_, j) => j !== i))} className="text-red-500">
                             <X className="w-3 h-3" />
@@ -262,7 +262,7 @@ function ServicesContent() {
                 <label className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest">Additional Notes</label>
                 <Textarea
                   placeholder="Any special requirements, tolerances, or finishing instructions..."
-                  className="bg-[var(--bg-input)] border-[var(--border-primary)] text-[var(--text-on-card)] text-sm min-h-[80px]"
+                  className="bg-[var(--bg-input)] border-[var(--border-primary)] text-[var(--text-on-input)] text-sm min-h-[80px]"
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
                 />

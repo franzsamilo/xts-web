@@ -73,6 +73,10 @@ export const Navbar = () => {
         <div className="flex items-center gap-2 sm:gap-3">
           <ThemeToggle />
 
+          <Link href="/chat" className="hidden md:inline-flex relative p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors" title="Messages">
+            <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+          </Link>
+
           <Link href="/cart" className="relative p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
             <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6" />
             {cartCount > 0 && (
@@ -97,6 +101,13 @@ export const Navbar = () => {
                       (session.user as any)?.role?.includes('admin') && "border-red-500/50 text-red-500 hover:bg-red-500/10"
                     )}>
                       {(session.user as any)?.role?.includes('admin') ? 'Terminal' : 'Portal'}
+                    </Button>
+                  </Link>
+                )}
+                {((session.user as any)?.role?.includes('admin') || (session.user as any)?.role?.includes('seller')) && (
+                  <Link href="/seller">
+                    <Button variant="outline" size="sm" className="border-blue-500/50 text-blue-500 hover:bg-blue-500/10">
+                      Seller
                     </Button>
                   </Link>
                 )}

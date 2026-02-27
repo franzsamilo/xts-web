@@ -87,7 +87,7 @@ export default function Home() {
               transition={{ duration: 0.5 }}
             >
               <Badge variant="new" className="mb-6">Project Horizon v1.0</Badge>
-              <h1 className="text-6xl md:text-8xl font-black text-white uppercase tracking-tighter leading-none mb-6">
+              <h1 className="text-4xl sm:text-6xl md:text-8xl font-black text-white uppercase tracking-tighter leading-none mb-6">
                 Engineering. <br />
                 <span className="text-safety-orange transition-all hover:tracking-normal cursor-default">Fabrication.</span> <br />
                 Community.

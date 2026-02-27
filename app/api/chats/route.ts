@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getChatsByUser, createChat } from '@/lib/chat';
+import { getChatsByUser, createChat, findExistingChat, addMessage } from '@/lib/chat';
 import { getServerSession } from 'next-auth';
 
 export async function GET(req: NextRequest) {
@@ -25,6 +25,27 @@ export async function POST(req: NextRequest) {
     }
     
     const body = await req.json();
+
+    // Check for existing chat to avoid duplicates
+    const existingChat = await findExistingChat(
+      session.user.email,
+      body.recipientId,
+      body.productRef?.id
+    );
+
+    if (existingChat) {
+      // If chat already exists, just add a new message if provided
+      if (body.initialMessage && existingChat.id) {
+        await addMessage(existingChat.id, {
+          senderId: session.user.email,
+          senderName: session.user.name || 'User',
+          content: body.initialMessage,
+          createdAt: new Date(),
+        });
+      }
+      return NextResponse.json(existingChat);
+    }
+
     const chat = await createChat({
       participants: [session.user.email, body.recipientId],
       participantNames: {
@@ -36,6 +57,16 @@ export async function POST(req: NextRequest) {
       lastMessage: body.initialMessage || '',
       createdAt: new Date(),
     });
+
+    // Post the initial message to the messages subcollection
+    if (body.initialMessage && chat.id) {
+      await addMessage(chat.id, {
+        senderId: session.user.email,
+        senderName: session.user.name || 'User',
+        content: body.initialMessage,
+        createdAt: new Date(),
+      });
+    }
     
     return NextResponse.json(chat);
   } catch (error) {

@@ -18,7 +18,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   try {
     const { id } = await params;
     const { status } = await req.json();
-    await updateOrderStatus(id, status);
+    await updateOrderStatus(id, status, session.user?.email || 'admin');
 
     await logAction({
       action: 'ORDER_STATUS_UPDATED',

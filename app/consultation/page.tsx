@@ -127,7 +127,7 @@ export default function ConsultationPage() {
                         <option.icon className="w-5 h-5 text-safety-orange group-hover:text-white" />
                       </div>
                       <h4 className="text-lg font-black text-[var(--text-on-card)] uppercase mb-2">{option.name}</h4>
-                      <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-4">{option.description}</p>
+                      <p className="text-xs text-[var(--text-muted)] leading-relaxed mb-4">{option.description}</p>
                       <div className="flex items-center justify-between pt-3 border-t border-[var(--border-secondary)]">
                         <span className="text-sm font-black text-safety-orange">{option.price}</span>
                         <ArrowRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-safety-orange group-hover:translate-x-1 transition-all" />
@@ -224,7 +224,7 @@ export default function ConsultationPage() {
                   <label className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest">Specific Specialty Needed</label>
                   <Input
                     placeholder="e.g., ROS2 navigation, PCB power design, servo tuning"
-                    className="bg-[var(--bg-input)] border-[var(--border-primary)] text-[var(--text-on-card)] text-sm h-10"
+                    className="bg-[var(--bg-input)] border-[var(--border-primary)] text-[var(--text-on-input)] text-sm h-10"
                     value={formData.specialty}
                     onChange={e => setFormData({ ...formData, specialty: e.target.value })}
                   />
@@ -234,7 +234,7 @@ export default function ConsultationPage() {
                   <label className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest">Project Description</label>
                   <Textarea
                     placeholder="Describe your project, the specific problem you're facing, and what outcome you expect from the consultation..."
-                    className="bg-[var(--bg-input)] border-[var(--border-primary)] text-[var(--text-on-card)] text-sm min-h-[100px]"
+                    className="bg-[var(--bg-input)] border-[var(--border-primary)] text-[var(--text-on-input)] text-sm min-h-[100px]"
                     value={formData.projectDescription}
                     onChange={e => setFormData({ ...formData, projectDescription: e.target.value })}
                   />
@@ -245,7 +245,7 @@ export default function ConsultationPage() {
                     <label className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest">Required Skills / Tools</label>
                     <Input
                       placeholder="e.g., KiCad, SolidWorks, C++"
-                      className="bg-[var(--bg-input)] border-[var(--border-primary)] text-[var(--text-on-card)] text-sm h-10"
+                      className="bg-[var(--bg-input)] border-[var(--border-primary)] text-[var(--text-on-input)] text-sm h-10"
                       value={formData.requiredSkills}
                       onChange={e => setFormData({ ...formData, requiredSkills: e.target.value })}
                     />
@@ -254,7 +254,7 @@ export default function ConsultationPage() {
                     <label className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest">Budget Range</label>
                     <Input
                       placeholder="e.g., PHP 2,000 - 5,000"
-                      className="bg-[var(--bg-input)] border-[var(--border-primary)] text-[var(--text-on-card)] text-sm h-10"
+                      className="bg-[var(--bg-input)] border-[var(--border-primary)] text-[var(--text-on-input)] text-sm h-10"
                       value={formData.budget}
                       onChange={e => setFormData({ ...formData, budget: e.target.value })}
                     />
@@ -265,7 +265,7 @@ export default function ConsultationPage() {
                   <label className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest">Preferred Timeline</label>
                   <Input
                     placeholder="e.g., Within this week, ASAP, Flexible"
-                    className="bg-[var(--bg-input)] border-[var(--border-primary)] text-[var(--text-on-card)] text-sm h-10"
+                    className="bg-[var(--bg-input)] border-[var(--border-primary)] text-[var(--text-on-input)] text-sm h-10"
                     value={formData.timeline}
                     onChange={e => setFormData({ ...formData, timeline: e.target.value })}
                   />
