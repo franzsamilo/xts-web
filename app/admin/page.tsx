@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { Package, Users, Activity, Settings, Plus, Search, Hammer, AlertTriangle, MessageCircle, X, ClipboardList, Truck, CheckCircle2, ArrowUpDown } from 'lucide-react';
+import { Package, Users, Activity, Settings, Plus, Search, Hammer, AlertTriangle, MessageCircle, X, ClipboardList, Truck, CheckCircle2, ArrowUpDown, MapPin, Trash2, Edit2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { useSession } from 'next-auth/react';
@@ -46,6 +46,14 @@ function AdminPanel() {
   const [showAuditModal, setShowAuditModal] = React.useState(false);
   const [loadingAudit, setLoadingAudit] = React.useState(false);
 
+  // Pickup Points State
+  const [pickupPoints, setPickupPoints] = React.useState<any[]>([]);
+  const [loadingPickupPoints, setLoadingPickupPoints] = React.useState(true);
+  const [showAddPickupForm, setShowAddPickupForm] = React.useState(false);
+  const [addingPickupPoint, setAddingPickupPoint] = React.useState(false);
+  const [editingPickupPoint, setEditingPickupPoint] = React.useState<any | null>(null);
+  const [newPickupPoint, setNewPickupPoint] = React.useState({ name: '', address: '' });
+
   // Edit Product State
   const [editingProduct, setEditingProduct] = React.useState<any | null>(null);
   const [savingEdit, setSavingEdit] = React.useState(false);
@@ -73,14 +81,16 @@ function AdminPanel() {
         setLoadingApps(true);
         setLoadingConsultations(true);
         setLoadingFabJobs(true);
+        setLoadingPickupPoints(true);
 
-        const [userRes, prodRes, appRes, consultRes, orderRes, fabRes] = await Promise.all([
+        const [userRes, prodRes, appRes, consultRes, orderRes, fabRes, pickupRes] = await Promise.all([
           fetch('/api/users'),
           fetch('/api/products'),
           fetch('/api/applications'),
           fetch('/api/consultations'),
           fetch('/api/orders'),
           fetch('/api/fabrication'),
+          fetch('/api/pickup-points'),
         ]);
 
         if (userRes.ok) setUsers(await userRes.json());
@@ -89,6 +99,7 @@ function AdminPanel() {
         if (consultRes.ok) setConsultations(await consultRes.json());
         if (orderRes.ok) setOrders(await orderRes.json());
         if (fabRes.ok) setFabJobs(await fabRes.json());
+        if (pickupRes.ok) setPickupPoints(await pickupRes.json());
         
       } catch (e) {
         console.error("Failed to sync system registry", e);
@@ -99,6 +110,7 @@ function AdminPanel() {
         setLoadingApps(false);
         setLoadingConsultations(false);
         setLoadingFabJobs(false);
+        setLoadingPickupPoints(false);
       }
     };
 
@@ -268,6 +280,57 @@ function AdminPanel() {
     }
   };
 
+  // Pickup Point CRUD
+  const handleAddPickupPoint = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddingPickupPoint(true);
+    try {
+      const res = await fetch('/api/pickup-points', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newPickupPoint),
+      });
+      if (res.ok) {
+        const point = await res.json();
+        setPickupPoints(prev => [point, ...prev]);
+        setShowAddPickupForm(false);
+        setNewPickupPoint({ name: '', address: '' });
+      }
+    } catch (e) {
+      console.error('Failed to add pickup point', e);
+    } finally {
+      setAddingPickupPoint(false);
+    }
+  };
+
+  const handleEditPickupPoint = async () => {
+    if (!editingPickupPoint) return;
+    try {
+      const res = await fetch(`/api/pickup-points/${editingPickupPoint.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editingPickupPoint.name, address: editingPickupPoint.address }),
+      });
+      if (res.ok) {
+        setPickupPoints(prev => prev.map(p => p.id === editingPickupPoint.id ? { ...p, ...editingPickupPoint } : p));
+        setEditingPickupPoint(null);
+      }
+    } catch (e) {
+      console.error('Failed to update pickup point', e);
+    }
+  };
+
+  const handleDeletePickupPoint = async (id: string) => {
+    try {
+      const res = await fetch(`/api/pickup-points/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setPickupPoints(prev => prev.filter(p => p.id !== id));
+      }
+    } catch (e) {
+      console.error('Failed to delete pickup point', e);
+    }
+  };
+
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     setAddingProduct(true);
@@ -355,6 +418,7 @@ function AdminPanel() {
                 <AdminTabTrigger value="inventory" icon={Package} label="Products" />
                 <AdminTabTrigger value="orders" icon={Activity} label="Orders" />
                 <AdminTabTrigger value="fabrication" icon={Hammer} label="Fabrication" />
+                <AdminTabTrigger value="pickuppoints" icon={MapPin} label="Pickup Points" />
                 <AdminTabTrigger value="applications" icon={Plus} label="Intake" />
                 <AdminTabTrigger value="users" icon={Users} label="Permissions" />
               </>
@@ -498,6 +562,7 @@ function AdminPanel() {
                           <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest">Order ID</th>
                           <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest">Customer</th>
                           <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest">Items</th>
+                          <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest">Delivery</th>
                           <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest">Total</th>
                           <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest">Status</th>
                           <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest text-right">Actions</th>
@@ -520,6 +585,19 @@ function AdminPanel() {
                                 ))}
                                 {(order.items || []).length > 2 && <span className="text-[10px] text-zinc-600">+{order.items.length - 2} more</span>}
                               </div>
+                            </td>
+                            <td className="p-4">
+                              {order.deliveryMethod === 'pickup' ? (
+                                <div className="flex items-center gap-1.5">
+                                  <MapPin className="w-3 h-3 text-blue-500 shrink-0" />
+                                  <span className="text-xs text-blue-400 font-bold">{order.pickupPointName || 'Pickup'}</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1.5">
+                                  <Truck className="w-3 h-3 text-safety-orange shrink-0" />
+                                  <span className="text-xs text-zinc-400 font-bold">Standard</span>
+                                </div>
+                              )}
                             </td>
                             <td className="p-4 text-sm font-black text-white">PHP {(order.total || 0).toFixed(2)}</td>
                             <td className="p-4">
@@ -736,6 +814,93 @@ function AdminPanel() {
                     icon={Hammer} 
                     title="No Active Jobs" 
                     description="No fabrication requests pending. Jobs will appear here when customers submit quote requests." 
+                  />
+                )}
+              </TabsContent>
+
+              {/* Pickup Points Management */}
+              <TabsContent value="pickuppoints" className="space-y-8 mt-0">
+                <div className="flex flex-col md:flex-row gap-6 justify-between items-center mb-10">
+                  <div>
+                    <h3 className="text-2xl font-black uppercase text-white tracking-tighter">Pickup Point Registry</h3>
+                    <p className="text-zinc-500 text-xs font-medium uppercase tracking-widest mt-1">Manage local meetup locations for order pickups</p>
+                  </div>
+                  <Button className="w-full md:w-auto flex gap-2" onClick={() => setShowAddPickupForm(!showAddPickupForm)}>
+                    {showAddPickupForm ? <AlertTriangle className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                    {showAddPickupForm ? 'Cancel' : 'Add Pickup Point'}
+                  </Button>
+                </div>
+
+                {showAddPickupForm && (
+                  <Card className="border-2 border-blue-500/20 overflow-hidden bg-black/40 mb-10">
+                    <form onSubmit={handleAddPickupPoint} className="p-8 space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Location Name</label>
+                          <Input required placeholder="Central Philippine University" className="bg-zinc-900 border-zinc-800" value={newPickupPoint.name} onChange={e => setNewPickupPoint({...newPickupPoint, name: e.target.value})} />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Address / Details</label>
+                          <Input required placeholder="CPU GAD Office, Jaro, Iloilo City" className="bg-zinc-900 border-zinc-800" value={newPickupPoint.address} onChange={e => setNewPickupPoint({...newPickupPoint, address: e.target.value})} />
+                        </div>
+                      </div>
+                      <div className="flex justify-end">
+                        <Button type="submit" disabled={addingPickupPoint} className="bg-blue-600 hover:bg-blue-700 h-12 px-10 uppercase text-xs font-black shadow-[0_4px_0_0_#1d4ed8]">
+                          {addingPickupPoint ? 'Adding...' : 'Add Pickup Point'}
+                        </Button>
+                      </div>
+                    </form>
+                  </Card>
+                )}
+
+                {loadingPickupPoints ? (
+                  <div className="py-20 flex justify-center"><Activity className="w-8 h-8 text-safety-orange animate-spin" /></div>
+                ) : pickupPoints.length > 0 ? (
+                  <div className="space-y-4">
+                    {pickupPoints.map((point: any) => (
+                      <Card key={point.id} className="border border-white/5 bg-black/40">
+                        {editingPickupPoint?.id === point.id ? (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Name</label>
+                                <Input className="bg-zinc-800 border-zinc-700" value={editingPickupPoint.name} onChange={e => setEditingPickupPoint({...editingPickupPoint, name: e.target.value})} />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Address</label>
+                                <Input className="bg-zinc-800 border-zinc-700" value={editingPickupPoint.address} onChange={e => setEditingPickupPoint({...editingPickupPoint, address: e.target.value})} />
+                              </div>
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                              <Button variant="outline" size="sm" onClick={() => setEditingPickupPoint(null)}>Cancel</Button>
+                              <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={handleEditPickupPoint}>Save</Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-blue-500/10 border border-blue-500/20 rounded-sm flex items-center justify-center shrink-0">
+                                <MapPin className="w-6 h-6 text-blue-500" />
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-black text-white uppercase tracking-tight">{point.name}</h4>
+                                <p className="text-xs text-zinc-500 font-medium">{point.address}</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 shrink-0">
+                              <Button variant="outline" size="sm" className="px-2 h-8 min-w-0" onClick={() => setEditingPickupPoint({...point})}><Edit2 className="w-3 h-3" /></Button>
+                              <Button variant="ghost" size="sm" className="px-2 h-8 min-w-0 text-red-500" onClick={() => handleDeletePickupPoint(point.id)}><Trash2 className="w-3 h-3" /></Button>
+                            </div>
+                          </div>
+                        )}
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyTerminalState
+                    icon={MapPin}
+                    title="No Pickup Points"
+                    description="Add local meetup points where buyers can pick up their orders."
                   />
                 )}
               </TabsContent>

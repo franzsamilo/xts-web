@@ -40,6 +40,9 @@ export async function POST(req: Request) {
       status: 'processing',
       customerName: session.user?.name || 'Unknown',
       customerEmail: session.user?.email || '',
+      deliveryMethod: body.deliveryMethod || 'standard',
+      pickupPointId: body.pickupPointId || undefined,
+      pickupPointName: body.pickupPointName || undefined,
       createdAt: new Date(),
     });
 

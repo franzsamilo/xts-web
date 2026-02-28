@@ -23,6 +23,9 @@ export interface OrderData {
   statusHistory?: StatusHistoryEntry[];
   customerName: string;
   customerEmail: string;
+  deliveryMethod: 'standard' | 'pickup';
+  pickupPointId?: string;
+  pickupPointName?: string;
   createdAt: Date | any;
 }
 

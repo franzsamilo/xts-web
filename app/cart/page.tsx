@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageShell } from '@/components/layout/PageShell';
@@ -10,7 +10,13 @@ import { Button } from '@/components/ui/Button';
 import { useCart } from '@/lib/cart-context';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Minus, Plus, X, ShoppingCart, Package, ArrowRight, Trash2, CheckCircle2, Activity } from 'lucide-react';
+import { Minus, Plus, X, ShoppingCart, Package, ArrowRight, Trash2, CheckCircle2, Activity, Truck, MapPin } from 'lucide-react';
+
+interface PickupPoint {
+  id: string;
+  name: string;
+  address: string;
+}
 
 export default function CartPage() {
   const { items, removeFromCart, updateQuantity, clearCart, cartCount, cartTotal } = useCart();
@@ -19,11 +25,34 @@ export default function CartPage() {
   const [checkingOut, setCheckingOut] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState<string | null>(null);
 
+  // Delivery state
+  const [deliveryMethod, setDeliveryMethod] = useState<'standard' | 'pickup' | null>(null);
+  const [pickupPoints, setPickupPoints] = useState<PickupPoint[]>([]);
+  const [selectedPickup, setSelectedPickup] = useState<PickupPoint | null>(null);
+  const [loadingPickupPoints, setLoadingPickupPoints] = useState(false);
+
+  // Fetch pickup points when pickup is selected
+  useEffect(() => {
+    if (deliveryMethod === 'pickup' && pickupPoints.length === 0) {
+      setLoadingPickupPoints(true);
+      fetch('/api/pickup-points')
+        .then(res => res.json())
+        .then(data => setPickupPoints(data))
+        .catch(() => {})
+        .finally(() => setLoadingPickupPoints(false));
+    }
+  }, [deliveryMethod, pickupPoints.length]);
+
+  const canCheckout = session && deliveryMethod && (deliveryMethod === 'standard' || (deliveryMethod === 'pickup' && selectedPickup));
+
   const handleCheckout = async () => {
     if (!session) {
       router.push('/login');
       return;
     }
+
+    if (!deliveryMethod) return;
+    if (deliveryMethod === 'pickup' && !selectedPickup) return;
 
     setCheckingOut(true);
     try {
@@ -40,6 +69,9 @@ export default function CartPage() {
             quantity: item.quantity,
           })),
           total: cartTotal,
+          deliveryMethod,
+          pickupPointId: selectedPickup?.id || undefined,
+          pickupPointName: selectedPickup?.name || undefined,
         }),
       });
 
@@ -125,6 +157,7 @@ export default function CartPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           <div className="lg:col-span-2 space-y-6">
+            {/* Cart Items */}
             <AnimatePresence mode="popLayout">
               {items.map((item) => (
                 <motion.div key={item.id} layout initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20, height: 0 }} transition={{ duration: 0.2 }}>
@@ -170,26 +203,191 @@ export default function CartPage() {
                 </motion.div>
               ))}
             </AnimatePresence>
+
+            {/* ─── Delivery Method Selector ─── */}
+            <div className="mt-10">
+              <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-6 flex items-center gap-3">
+                <Truck className="w-5 h-5 text-safety-orange" />
+                Select Delivery Method
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Standard Delivery */}
+                <button
+                  id="delivery-standard"
+                  onClick={() => { setDeliveryMethod('standard'); setSelectedPickup(null); }}
+                  className={`relative text-left p-6 rounded-sm border-2 transition-all duration-200 group ${
+                    deliveryMethod === 'standard'
+                      ? 'border-safety-orange bg-safety-orange/5 shadow-lg shadow-safety-orange/10'
+                      : 'border-white/10 bg-zinc-900 hover:border-white/20'
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`w-12 h-12 rounded-sm flex items-center justify-center shrink-0 transition-colors ${
+                      deliveryMethod === 'standard' ? 'bg-safety-orange text-white' : 'bg-zinc-800 text-zinc-500 group-hover:text-white'
+                    }`}>
+                      <Truck className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase tracking-tight mb-1">Standard Delivery</h4>
+                      <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest leading-relaxed">
+                        Delivered via courier partner (J&T Express)
+                      </p>
+                      <div className="mt-3 flex items-center gap-2">
+                        <span className="text-[9px] font-black text-yellow-500 uppercase tracking-widest bg-yellow-500/10 px-2 py-1 rounded-sm border border-yellow-500/20">
+                          Integration Pending
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  {deliveryMethod === 'standard' && (
+                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute top-3 right-3">
+                      <CheckCircle2 className="w-5 h-5 text-safety-orange" />
+                    </motion.div>
+                  )}
+                </button>
+
+                {/* Pickup Point */}
+                <button
+                  id="delivery-pickup"
+                  onClick={() => setDeliveryMethod('pickup')}
+                  className={`relative text-left p-6 rounded-sm border-2 transition-all duration-200 group ${
+                    deliveryMethod === 'pickup'
+                      ? 'border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/10'
+                      : 'border-white/10 bg-zinc-900 hover:border-white/20'
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`w-12 h-12 rounded-sm flex items-center justify-center shrink-0 transition-colors ${
+                      deliveryMethod === 'pickup' ? 'bg-blue-500 text-white' : 'bg-zinc-800 text-zinc-500 group-hover:text-white'
+                    }`}>
+                      <MapPin className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase tracking-tight mb-1">Local Pickup</h4>
+                      <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest leading-relaxed">
+                        Pick up from a designated meetup point
+                      </p>
+                      <div className="mt-3 flex items-center gap-2">
+                        <span className="text-[9px] font-black text-green-500 uppercase tracking-widest bg-green-500/10 px-2 py-1 rounded-sm border border-green-500/20">
+                          Available Now
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  {deliveryMethod === 'pickup' && (
+                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute top-3 right-3">
+                      <CheckCircle2 className="w-5 h-5 text-blue-500" />
+                    </motion.div>
+                  )}
+                </button>
+              </div>
+
+              {/* Pickup Point Selection */}
+              <AnimatePresence>
+                {deliveryMethod === 'pickup' && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-4 p-6 bg-zinc-900 border border-blue-500/20 rounded-sm">
+                      <h4 className="text-xs font-black text-zinc-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <MapPin className="w-3 h-3 text-blue-500" />
+                        Choose Pickup Location
+                      </h4>
+
+                      {loadingPickupPoints ? (
+                        <div className="py-8 flex justify-center">
+                          <Activity className="w-6 h-6 text-blue-500 animate-spin" />
+                        </div>
+                      ) : pickupPoints.length > 0 ? (
+                        <div className="space-y-3">
+                          {pickupPoints.map(point => (
+                            <button
+                              key={point.id}
+                              onClick={() => setSelectedPickup(point)}
+                              className={`w-full text-left px-4 py-3 rounded-sm border transition-all ${
+                                selectedPickup?.id === point.id
+                                  ? 'border-blue-500 bg-blue-500/10'
+                                  : 'border-white/5 bg-zinc-800/50 hover:border-white/15'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                                  selectedPickup?.id === point.id ? 'bg-blue-500 text-white' : 'bg-zinc-700 text-zinc-400'
+                                }`}>
+                                  <MapPin className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <span className="text-sm font-bold text-white block">{point.name}</span>
+                                  <span className="text-[10px] text-zinc-500 font-medium">{point.address}</span>
+                                </div>
+                                {selectedPickup?.id === point.id && (
+                                  <CheckCircle2 className="w-4 h-4 text-blue-500 ml-auto shrink-0" />
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="py-8 text-center">
+                          <MapPin className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
+                          <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest">No pickup points available</p>
+                          <p className="text-[10px] text-zinc-600 mt-1">Contact the admin to add pickup locations.</p>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
+          {/* ─── Order Summary Sidebar ─── */}
           <div className="space-y-6">
             <div className="sticky top-32">
               <div className="p-8 bg-zinc-900 border border-white/5 rounded-sm shadow-2xl">
                 <h4 className="text-lg font-black text-white uppercase mb-8 tracking-tighter">Order Summary</h4>
-                <div className="space-y-4 mb-8">
+                <div className="space-y-4 mb-4">
                   <div className="flex justify-between text-sm">
                     <span className="text-zinc-500 font-bold uppercase">Subtotal ({cartCount} items)</span>
                     <span className="text-white font-black">PHP {cartTotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-zinc-500 font-bold uppercase">Shipping</span>
-                    <span className="text-zinc-400 font-medium italic">Free</span>
+                    <span className="text-zinc-400 font-medium italic">
+                      {deliveryMethod === 'standard' ? 'TBD' : deliveryMethod === 'pickup' ? 'Free (Pickup)' : '—'}
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-zinc-500 font-bold uppercase">Tax</span>
                     <span className="text-zinc-400 font-medium italic">Included</span>
                   </div>
                 </div>
+
+                {/* Delivery method summary */}
+                {deliveryMethod && (
+                  <div className="mb-6 p-3 rounded-sm border border-white/5 bg-zinc-800/50">
+                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Delivery</span>
+                    {deliveryMethod === 'standard' ? (
+                      <div className="flex items-center gap-2">
+                        <Truck className="w-3.5 h-3.5 text-safety-orange" />
+                        <span className="text-xs font-bold text-white">Standard Delivery (J&T)</span>
+                      </div>
+                    ) : selectedPickup ? (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-3.5 h-3.5 text-blue-500" />
+                        <span className="text-xs font-bold text-white">{selectedPickup.name}</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-yellow-500 font-bold">Select a pickup point</span>
+                    )}
+                  </div>
+                )}
+
                 <div className="pt-6 border-t border-white/10 mb-8">
                   <div className="flex justify-between items-end">
                     <span className="text-xs font-black text-zinc-500 uppercase tracking-widest">Total</span>
@@ -203,10 +401,17 @@ export default function CartPage() {
                   </div>
                 )}
 
+                {session && !deliveryMethod && (
+                  <div className="mb-4 p-3 bg-yellow-950/30 border border-yellow-500/20 rounded-sm">
+                    <p className="text-xs text-yellow-400 font-bold">Please select a delivery method below.</p>
+                  </div>
+                )}
+
                 <Button
-                  className="w-full h-14 text-sm uppercase font-black tracking-widest bg-safety-orange hover:bg-safety-orange/80 shadow-[0_6px_0_0_#995400] active:translate-y-[2px] active:shadow-[0_4px_0_0_#995400] transition-all"
+                  id="place-order-btn"
+                  className="w-full h-14 text-sm uppercase font-black tracking-widest bg-safety-orange hover:bg-safety-orange/80 shadow-[0_6px_0_0_#995400] active:translate-y-[2px] active:shadow-[0_4px_0_0_#995400] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   onClick={handleCheckout}
-                  disabled={checkingOut || !session}
+                  disabled={checkingOut || !canCheckout}
                 >
                   {checkingOut ? (
                     <span className="flex items-center gap-2"><Activity className="w-5 h-5 animate-spin" /> Processing...</span>

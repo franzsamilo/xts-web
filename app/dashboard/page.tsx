@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { ServiceQueue } from '@/components/fabrication/ServiceQueue';
-import { Package, Settings, PenTool, LayoutDashboard, History, MessageCircle, User as UserIcon, ShoppingBag, LogOut, Mail, Shield, Activity } from 'lucide-react';
+import { Package, Settings, PenTool, LayoutDashboard, History, MessageCircle, User as UserIcon, ShoppingBag, LogOut, Mail, Shield, Activity, Truck, MapPin } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 
 export default function DashboardPage() {
@@ -164,12 +164,30 @@ export default function DashboardPage() {
                             <span className="text-xs font-black text-zinc-400 uppercase tracking-widest">{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'Recent'}</span>
                             <h4 className="text-xl font-bold text-esd-dark mt-1">#{order.id?.slice(0, 8).toUpperCase()}</h4>
                             <p className="text-zinc-600 text-sm">{(order.items || []).map((i: any) => i.name).join(', ')}</p>
+                            {order.deliveryMethod && (
+                              <div className="flex items-center gap-1.5 mt-1">
+                                {order.deliveryMethod === 'pickup' ? (
+                                  <><MapPin className="w-3 h-3 text-blue-500" /><span className="text-[10px] text-blue-400 font-bold uppercase">Pickup: {order.pickupPointName || 'Local'}</span></>
+                                ) : (
+                                  <><Truck className="w-3 h-3 text-safety-orange" /><span className="text-[10px] text-zinc-500 font-bold uppercase">Standard Delivery</span></>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-8">
                              <div className="text-right">
                                <p className="text-xl font-black text-esd-dark">PHP {(order.total || 0).toFixed(2)}</p>
                                <Badge variant={order.status === 'delivered' ? 'completed' : order.status === 'shipped' ? 'in-progress' : 'pending'}>{(order.status || 'processing').toUpperCase()}</Badge>
                              </div>
+                            {order.deliveryMethod && (
+                              <div className="flex items-center gap-1.5 mt-2">
+                                {order.deliveryMethod === 'pickup' ? (
+                                  <><MapPin className="w-3 h-3 text-blue-500" /><span className="text-[10px] text-blue-400 font-bold uppercase">Pickup: {order.pickupPointName || 'Local'}</span></>
+                                ) : (
+                                  <><Truck className="w-3 h-3 text-safety-orange" /><span className="text-[10px] text-zinc-500 font-bold uppercase">Standard Delivery</span></>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </Card>
                       ))
