@@ -5,8 +5,12 @@ import { authOptions } from '@/lib/auth';
 
 export async function GET() {
   try {
-    // Public endpoint — returns active pickup points
-    const points = await getAllPickupPoints(true);
+    // Check if admin — return all points (including inactive)
+    const session = await getServerSession(authOptions);
+    const role = (session?.user as any)?.role || '';
+    const isAdmin = role.includes('admin');
+
+    const points = await getAllPickupPoints(!isAdmin);
     return NextResponse.json(points);
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch pickup points' }, { status: 500 });
