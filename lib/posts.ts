@@ -11,6 +11,7 @@ export interface PostData {
   likedBy: string[];
   comments: number;
   isPinned: boolean;
+  imageUrls?: string[];
   createdAt: Date | any;
 }
 

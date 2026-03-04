@@ -18,8 +18,10 @@ interface Chat {
   participants: string[];
   participantNames: Record<string, string>;
   productRef?: { id: string; name: string; price: number; imageUrl?: string };
+  pickupRef?: { pointId: string; pointName: string; pointAddress: string };
   lastMessage?: string;
   lastMessageAt?: string;
+  hasUnread?: boolean;
   type: string;
 }
 
@@ -204,9 +206,12 @@ export default function ChatPage() {
                             <UserIcon className="w-4 h-4 text-safety-orange" />
                           </div>
                           <div className="flex-grow min-w-0">
-                            <h4 className="text-sm font-bold text-[var(--text-primary)] truncate">{getOtherName(chat)}</h4>
-                            <p className="text-[10px] text-[var(--text-muted)] truncate">{chat.lastMessage || 'No messages yet'}</p>
+                            <h4 className={`text-sm font-bold text-[var(--text-primary)] truncate ${chat.hasUnread ? 'font-black' : ''}`}>{getOtherName(chat)}</h4>
+                            <p className={`text-[10px] truncate ${chat.hasUnread ? 'text-[var(--text-primary)] font-bold' : 'text-[var(--text-muted)]'}`}>{chat.lastMessage || 'No messages yet'}</p>
                           </div>
+                          {chat.hasUnread && (
+                            <span className="w-2.5 h-2.5 bg-safety-orange rounded-full shrink-0 animate-pulse" />
+                          )}
                           <Badge variant={chat.type === 'product' ? 'new' : chat.type === 'consultation' ? 'in-progress' : 'pending'} className="text-[7px] shrink-0">
                             {chat.type}
                           </Badge>

@@ -26,6 +26,7 @@ export interface OrderData {
   deliveryMethod: 'standard' | 'pickup';
   pickupPointId?: string;
   pickupPointName?: string;
+  paymentMethod?: 'cod' | 'gcash';
   createdAt: Date | any;
 }
 

@@ -34,6 +34,7 @@ export async function POST(req: Request) {
       likedBy: [],
       comments: 0,
       isPinned: false,
+      imageUrls: body.imageUrls || [],
       createdAt: new Date(),
     });
 

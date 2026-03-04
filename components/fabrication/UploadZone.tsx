@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import { FileText, X, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 
-const ALLOWED_EXTENSIONS = ['.stl', '.dxf', '.zip', '.rar', '.gerber', '.gbr', '.gbl', '.gtl', '.gbs', '.gts', '.gbo', '.gto', '.drl', '.step', '.stp', '.iges', '.igs'];
+const ALLOWED_EXTENSIONS = ['.stl', '.3mf', '.dxf', '.svg', '.zip', '.rar', '.gerber', '.gbr', '.gbl', '.gtl', '.gbs', '.gts', '.gbo', '.gto', '.drl', '.step', '.stp', '.iges', '.igs'];
 
 const isAllowedFile = (file: File): boolean => {
   const ext = '.' + file.name.split('.').pop()?.toLowerCase();
@@ -166,16 +166,16 @@ export const UploadZone = () => {
             <UploadIcon className={cn("w-10 h-10 transition-colors", dragActive ? "text-safety-orange" : "text-zinc-500")} />
           </div>
           <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-2">FABRICATION IN-TRAY</h3>
-          <p className="text-zinc-500 font-handwriting text-lg mb-2">Drop STL, DXF, or Gerber files here</p>
+          <p className="text-zinc-500 font-handwriting text-lg mb-2">Drop STL, 3MF, DXF, SVG, or Gerber files here</p>
           <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-widest mb-8">
-            Accepted: .stl, .dxf, .step, .iges, .zip, .gerber
+            Accepted: .stl, .3mf, .dxf, .svg, .step, .iges, .zip, .gerber
           </p>
 
           <label className="cursor-pointer">
             <input
               type="file"
               multiple
-              accept=".stl,.dxf,.zip,.rar,.gerber,.gbr,.gbl,.gtl,.gbs,.gts,.gbo,.gto,.drl,.step,.stp,.iges,.igs"
+              accept=".stl,.3mf,.dxf,.svg,.zip,.rar,.gerber,.gbr,.gbl,.gtl,.gbs,.gts,.gbo,.gto,.drl,.step,.stp,.iges,.igs"
               className="hidden"
               onChange={handleFileInput}
             />

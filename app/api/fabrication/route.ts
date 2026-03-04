@@ -41,6 +41,9 @@ export async function POST(req: Request) {
       customerName: session.user?.name || 'Unknown',
       customerEmail: session.user?.email || '',
       notes: body.notes || '',
+      serviceType: body.serviceType || undefined,
+      parameters: body.parameters || undefined,
+      preferredSchedule: body.preferredSchedule || undefined,
       createdAt: new Date(),
     });
 

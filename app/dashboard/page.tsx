@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { ServiceQueue } from '@/components/fabrication/ServiceQueue';
-import { Package, Settings, PenTool, LayoutDashboard, History, MessageCircle, User as UserIcon, ShoppingBag, LogOut, Mail, Shield, Activity, Truck, MapPin } from 'lucide-react';
+import { Package, Settings, PenTool, LayoutDashboard, History, MessageCircle, User as UserIcon, ShoppingBag, LogOut, Mail, Shield, Activity, Truck, MapPin, Banknote, CreditCard } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 
 export default function DashboardPage() {
@@ -173,6 +173,15 @@ export default function DashboardPage() {
                                 )}
                               </div>
                             )}
+                            {order.paymentMethod && (
+                              <div className="flex items-center gap-1.5 mt-1">
+                                {order.paymentMethod === 'gcash' ? (
+                                  <><CreditCard className="w-3 h-3 text-blue-400" /><span className="text-[10px] text-blue-400 font-bold uppercase">GCash</span></>
+                                ) : (
+                                  <><Banknote className="w-3 h-3 text-green-500" /><span className="text-[10px] text-green-400 font-bold uppercase">COD</span></>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-8">
                              <div className="text-right">
@@ -225,6 +234,15 @@ export default function DashboardPage() {
                         <div className="text-right">
                           <p className="text-xl font-black text-esd-dark">PHP {(order.total || 0).toFixed(2)}</p>
                           <Badge variant={order.status === 'delivered' ? 'completed' : order.status === 'shipped' ? 'in-progress' : 'pending'}>{(order.status || 'processing').toUpperCase()}</Badge>
+                          {order.paymentMethod && (
+                            <div className="flex items-center gap-1 mt-1">
+                              {order.paymentMethod === 'gcash' ? (
+                                <><CreditCard className="w-3 h-3 text-blue-400" /><span className="text-[10px] text-blue-400 font-bold uppercase">GCash</span></>
+                              ) : (
+                                <><Banknote className="w-3 h-3 text-green-500" /><span className="text-[10px] text-green-400 font-bold uppercase">COD</span></>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </Card>
                     ))}

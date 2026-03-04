@@ -9,6 +9,9 @@ export interface FabJobData {
   customerName: string;
   customerEmail: string;
   notes?: string;
+  serviceType?: string; // '3d-printing' | 'laser-cutting' | 'pcb-fabrication'
+  parameters?: Record<string, string>;
+  preferredSchedule?: { startDate: string; endDate: string };
   createdAt: Date | any;
 }
 

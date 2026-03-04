@@ -97,15 +97,15 @@ export default function ShopPage() {
         {loading ? (
           <div className="py-20 flex justify-center"><Activity className="w-8 h-8 text-safety-orange animate-spin" /></div>
         ) : filtered.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-6">
             <AnimatePresence mode="popLayout">
               {filtered.map((product, i) => (
                 <motion.div key={product.id} layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, delay: i * 0.03 }}>
-                  <div className="group relative">
+                  <div className="group relative h-full">
                     <Link href={`/shop/${product.id}`}>
-                      <Card hoverEffect={false} className="transition-transform duration-200 group-hover:scale-[1.02] group-hover:-translate-y-1">
+                      <Card hoverEffect={false} className="transition-transform duration-200 group-hover:scale-[1.02] group-hover:-translate-y-1 h-full flex flex-col">
                         {/* Image */}
-                        <div className="aspect-square bg-[var(--bg-surface)] rounded-sm overflow-hidden mb-3 relative border border-[var(--border-secondary)]">
+                        <div className="aspect-square bg-[var(--bg-surface)] rounded-sm overflow-hidden mb-3 relative border border-[var(--border-secondary)] shrink-0">
                           {product.imageUrls?.[0] ? (
                             <img src={product.imageUrls[0]} alt={product.name} className="w-full h-full object-cover" />
                           ) : (
@@ -124,7 +124,7 @@ export default function ShopPage() {
                         </div>
 
                         {/* Info */}
-                        <div>
+                        <div className="flex flex-col flex-grow">
                           <p className="text-[9px] sm:text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-0.5">{product.category}</p>
                           <h3 className="text-xs sm:text-sm font-black text-[var(--text-on-card)] uppercase leading-tight mb-1.5 line-clamp-2 group-hover:text-safety-orange transition-colors">{product.name}</h3>
                           
@@ -141,7 +141,7 @@ export default function ShopPage() {
                             )}
                           </div>
 
-                          <div className="flex items-end justify-between">
+                          <div className="flex items-end justify-between mt-auto">
                             <span className="text-base sm:text-lg font-black text-[var(--text-on-card)]">₱{parseFloat(product.price).toLocaleString()}</span>
                           </div>
                         </div>

@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input, Textarea } from '@/components/ui/Input';
+import { DateTimePicker } from '@/components/ui/DateTimePicker';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { Printer, Scissors, Cpu, ArrowLeft, Upload, Activity, CheckCircle2, X } from 'lucide-react';
 import { useSession } from 'next-auth/react';
@@ -21,6 +22,11 @@ const serviceOptions = [
     icon: Printer,
     description: 'High-precision FDM and SLA printing for prototypes, functional parts, and custom enclosures. Supports PLA, ABS, PETG, Resin, and Nylon materials.',
     turnaround: '24-72 hours',
+    acceptedFiles: {
+      extensions: ['.stl', '.3mf', '.step', '.stp'],
+      label: '.STL, .3MF, .STEP / .STP',
+      accept: '.stl,.3mf,.step,.stp',
+    },
     fields: [
       { name: 'material', label: 'Material', type: 'select', options: ['PLA', 'ABS', 'PETG', 'Resin (SLA)', 'Nylon', 'TPU'] },
       { name: 'infill', label: 'Infill %', type: 'select', options: ['20%', '40%', '60%', '80%', '100%'] },
@@ -36,6 +42,11 @@ const serviceOptions = [
     icon: Scissors,
     description: 'Precision laser cutting for acrylic, wood, metal, and custom materials with ±0.1mm accuracy. Perfect for panels, enclosures, and structural components.',
     turnaround: '24-48 hours',
+    acceptedFiles: {
+      extensions: ['.dxf', '.svg'],
+      label: '.DXF, .SVG',
+      accept: '.dxf,.svg',
+    },
     fields: [
       { name: 'material', label: 'Material', type: 'select', options: ['Acrylic', 'Wood (MDF)', 'Wood (Plywood)', 'Stainless Steel', 'Aluminum', 'Carbon Fiber'] },
       { name: 'thickness', label: 'Material Thickness', type: 'select', options: ['1mm', '2mm', '3mm', '5mm', '6mm', '10mm'] },
@@ -46,10 +57,15 @@ const serviceOptions = [
   },
   {
     id: 'pcb-fabrication',
-    name: 'PCB Fabrication',
+    name: 'PCB Etch & Drill',
     icon: Cpu,
-    description: 'Custom PCB manufacturing from single-layer to multi-layer boards. Supports standard FR4, flexible PCBs, and aluminum substrates with rapid prototyping turnaround.',
+    description: 'Custom PCB manufacturing from single-layer to multi-layer boards. Submit Gerber files (.zip containing all layers + .drl drill file).',
     turnaround: '3-5 business days',
+    acceptedFiles: {
+      extensions: ['.zip'],
+      label: '.ZIP (Gerber files + .DRL drill file)',
+      accept: '.zip',
+    },
     fields: [
       { name: 'layers', label: 'Number of Layers', type: 'select', options: ['1 Layer', '2 Layers', '4 Layers', '6 Layers'] },
       { name: 'material', label: 'Substrate', type: 'select', options: ['FR4 (Standard)', 'Aluminum', 'Flexible (FPC)', 'Rogers'] },
@@ -72,14 +88,62 @@ function ServicesContent() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [notes, setNotes] = useState('');
+  const [scheduleStart, setScheduleStart] = useState({ date: '', time: '' });
+  const [scheduleEnd, setScheduleEnd] = useState({ date: '', time: '' });
+  const [fileError, setFileError] = useState<string | null>(null);
 
   const service = serviceOptions.find(s => s.id === selectedService);
+
+  const validateFile = (file: File, svc: typeof serviceOptions[0]): boolean => {
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+    return svc.acceptedFiles.extensions.includes(ext);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, svc: typeof serviceOptions[0]) => {
+    const incoming = Array.from(e.target.files || []);
+    const valid: File[] = [];
+    const rejected: string[] = [];
+
+    incoming.forEach(f => {
+      if (validateFile(f, svc)) {
+        valid.push(f);
+      } else {
+        rejected.push(f.name);
+      }
+    });
+
+    if (rejected.length > 0) {
+      setFileError(`Invalid files: ${rejected.join(', ')}. Accepted: ${svc.acceptedFiles.label}`);
+      setTimeout(() => setFileError(null), 5000);
+    }
+
+    if (valid.length > 0) {
+      setFiles(prev => [...prev, ...valid]);
+    }
+    e.target.value = '';
+  };
 
   const handleSubmit = async () => {
     if (!service || !session) return;
     setSubmitting(true);
     try {
+      // Upload files first
+      const uploadedUrls: string[] = [];
+      for (const file of files) {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch('/api/upload', { method: 'POST', body: fd });
+        if (res.ok) {
+          const data = await res.json();
+          uploadedUrls.push(data.url);
+        }
+      }
+
       const fileNames = files.map(f => f.name);
+      const preferredSchedule = scheduleStart.date
+        ? { startDate: `${scheduleStart.date} ${scheduleStart.time}`, endDate: `${scheduleEnd.date} ${scheduleEnd.time}` }
+        : undefined;
+
       const res = await fetch('/api/fabrication', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -87,8 +151,10 @@ function ServicesContent() {
           name: `${service.name} — ${formData.material || 'Custom'}`,
           serviceType: service.id,
           files: fileNames,
+          fileUrls: uploadedUrls,
           parameters: formData,
           notes,
+          preferredSchedule,
         }),
       });
       if (res.ok) {
@@ -99,6 +165,8 @@ function ServicesContent() {
           setFormData({});
           setFiles([]);
           setNotes('');
+          setScheduleStart({ date: '', time: '' });
+          setScheduleEnd({ date: '', time: '' });
         }, 3000);
       }
     } catch (e) {
@@ -142,9 +210,16 @@ function ServicesContent() {
                   </div>
                   <h3 className="text-xl font-black text-[var(--text-on-card)] uppercase mb-3">{svc.name}</h3>
                   <p className="text-[var(--text-secondary)] text-sm mb-4 leading-relaxed">{svc.description}</p>
-                  <div className="flex items-center justify-between pt-4 border-t border-[var(--border-secondary)]">
-                    <Badge variant="new" className="text-[9px]">{svc.turnaround}</Badge>
-                    <Button size="sm" className="text-xs">Get Started</Button>
+                  <div className="mt-auto">
+                    <div className="flex items-center justify-between pt-4 border-t border-[var(--border-secondary)]">
+                      <Badge variant="new" className="text-[9px]">{svc.turnaround}</Badge>
+                      <Button size="sm" className="text-xs">Get Started</Button>
+                    </div>
+                    <div className="mt-3 px-2 py-1.5 bg-[var(--bg-surface)] rounded-sm border border-[var(--border-secondary)]">
+                      <p className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-widest">
+                        Accepted: {svc.acceptedFiles.label}
+                      </p>
+                    </div>
                   </div>
                 </Card>
               </motion.div>
@@ -156,9 +231,9 @@ function ServicesContent() {
             <div className="p-6 bg-[var(--bg-surface)] border border-[var(--border-primary)] rounded-sm">
               <h4 className="text-lg font-black text-[var(--text-primary)] uppercase mb-4">File Guidelines</h4>
               <ul className="space-y-3 text-[var(--text-secondary)] text-sm">
-                <li className="flex gap-2"><span className="text-safety-orange">•</span> STL files must be binary format</li>
-                <li className="flex gap-2"><span className="text-safety-orange">•</span> DXF units in millimeters</li>
-                <li className="flex gap-2"><span className="text-safety-orange">•</span> Gerber files in .ZIP archive</li>
+                <li className="flex gap-2"><span className="text-safety-orange font-black">3D</span> .STL, .3MF, .STEP / .STP</li>
+                <li className="flex gap-2"><span className="text-safety-orange font-black">Laser</span> .DXF, .SVG</li>
+                <li className="flex gap-2"><span className="text-safety-orange font-black">PCB</span> Gerber .ZIP (includes .DRL)</li>
                 <li className="flex gap-2"><span className="text-safety-orange">•</span> Max file size: 50MB</li>
               </ul>
             </div>
@@ -225,29 +300,37 @@ function ServicesContent() {
                 ))}
               </div>
 
-              {/* File Upload */}
+              {/* File Upload — service-specific */}
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest">Design Files</label>
                 <div className="border-2 border-dashed border-[var(--border-primary)] rounded-sm p-6 text-center hover:border-safety-orange transition-colors">
                   <Upload className="w-8 h-8 text-[var(--text-muted)] mx-auto mb-2" />
-                  <p className="text-xs text-[var(--text-muted)] mb-2">Drop files here or click to browse</p>
+                  <p className="text-xs text-[var(--text-muted)] mb-1">Drop files here or click to browse</p>
+                  <p className="text-[10px] font-bold text-safety-orange mb-3">
+                    Accepted: {service.acceptedFiles.label}
+                  </p>
                   <input
                     type="file"
                     multiple
+                    accept={service.acceptedFiles.accept}
                     className="hidden"
-                    id="file-upload"
-                    onChange={e => setFiles(Array.from(e.target.files || []))}
+                    id="service-file-upload"
+                    onChange={e => handleFileSelect(e, service)}
                   />
-                  <label htmlFor="file-upload">
-                    <Button size="sm" variant="outline" className="text-xs cursor-pointer" onClick={() => document.getElementById('file-upload')?.click()}>
+                  <label htmlFor="service-file-upload">
+                    <Button size="sm" variant="outline" className="text-xs cursor-pointer" onClick={() => document.getElementById('service-file-upload')?.click()}>
                       Choose Files
                     </Button>
                   </label>
+                  {fileError && (
+                    <p className="mt-2 text-xs text-red-500 font-bold">{fileError}</p>
+                  )}
                   {files.length > 0 && (
                     <div className="mt-3 space-y-1">
                       {files.map((f, i) => (
                         <div key={i} className="text-xs text-[var(--text-on-input)] flex items-center gap-2 justify-center">
                           <span>{f.name}</span>
+                          <span className="text-[var(--text-muted)]">({(f.size / 1024 / 1024).toFixed(2)} MB)</span>
                           <button onClick={() => setFiles(files.filter((_, j) => j !== i))} className="text-red-500">
                             <X className="w-3 h-3" />
                           </button>
@@ -257,6 +340,19 @@ function ServicesContent() {
                   )}
                 </div>
               </div>
+
+              {/* Schedule */}
+              <DateTimePicker
+                label="Preferred Schedule (Optional)"
+                startDate={scheduleStart.date}
+                startTime={scheduleStart.time}
+                endDate={scheduleEnd.date}
+                endTime={scheduleEnd.time}
+                onStartDateChange={(v) => setScheduleStart(p => ({ ...p, date: v }))}
+                onStartTimeChange={(v) => setScheduleStart(p => ({ ...p, time: v }))}
+                onEndDateChange={(v) => setScheduleEnd(p => ({ ...p, date: v }))}
+                onEndTimeChange={(v) => setScheduleEnd(p => ({ ...p, time: v }))}
+              />
 
               {/* Notes */}
               <div className="space-y-1.5">

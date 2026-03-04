@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { useCart } from '@/lib/cart-context';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Minus, Plus, X, ShoppingCart, Package, ArrowRight, Trash2, CheckCircle2, Activity, Truck, MapPin } from 'lucide-react';
+import { Minus, Plus, X, ShoppingCart, Package, ArrowRight, Trash2, CheckCircle2, Activity, Truck, MapPin, CreditCard, Banknote, MessageCircle } from 'lucide-react';
 
 interface PickupPoint {
   id: string;
@@ -31,6 +31,9 @@ export default function CartPage() {
   const [selectedPickup, setSelectedPickup] = useState<PickupPoint | null>(null);
   const [loadingPickupPoints, setLoadingPickupPoints] = useState(false);
 
+  // Payment state
+  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'gcash' | null>(null);
+
   // Fetch pickup points when pickup is selected
   useEffect(() => {
     if (deliveryMethod === 'pickup' && pickupPoints.length === 0) {
@@ -43,7 +46,34 @@ export default function CartPage() {
     }
   }, [deliveryMethod, pickupPoints.length]);
 
-  const canCheckout = session && deliveryMethod && (deliveryMethod === 'standard' || (deliveryMethod === 'pickup' && selectedPickup));
+  const canCheckout = session && deliveryMethod && paymentMethod && (deliveryMethod === 'standard' || (deliveryMethod === 'pickup' && selectedPickup));
+
+  const handlePickupChat = async () => {
+    if (!session || !selectedPickup) return;
+    try {
+      const res = await fetch('/api/chats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipientId: 'admin@xts.com',
+          recipientName: 'XTS Admin',
+          type: 'pickup',
+          initialMessage: `Hi! I'd like to arrange pickup at ${selectedPickup.name} (${selectedPickup.address}). I have ${cartCount} item(s) totaling ₱${cartTotal.toLocaleString()}.`,
+          pickupRef: {
+            pointId: selectedPickup.id,
+            pointName: selectedPickup.name,
+            pointAddress: selectedPickup.address,
+          },
+        }),
+      });
+      if (res.ok) {
+        const chat = await res.json();
+        router.push(`/chat?id=${chat.id}`);
+      }
+    } catch (e) {
+      console.error('Failed to create pickup chat', e);
+    }
+  };
 
   const handleCheckout = async () => {
     if (!session) {
@@ -51,7 +81,7 @@ export default function CartPage() {
       return;
     }
 
-    if (!deliveryMethod) return;
+    if (!deliveryMethod || !paymentMethod) return;
     if (deliveryMethod === 'pickup' && !selectedPickup) return;
 
     setCheckingOut(true);
@@ -72,6 +102,7 @@ export default function CartPage() {
           deliveryMethod,
           pickupPointId: selectedPickup?.id || undefined,
           pickupPointName: selectedPickup?.name || undefined,
+          paymentMethod,
         }),
       });
 
@@ -339,10 +370,108 @@ export default function CartPage() {
                           <p className="text-[10px] text-zinc-600 mt-1">Contact the admin to add pickup locations.</p>
                         </div>
                       )}
+
+                      {/* Chat about Pickup Button */}
+                      {selectedPickup && session && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="mt-4 pt-4 border-t border-white/5"
+                        >
+                          <button
+                            onClick={handlePickupChat}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-500/10 border border-blue-500/30 rounded-sm text-blue-400 hover:bg-blue-500/20 transition-colors"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                            <span className="text-xs font-black uppercase tracking-widest">Chat about Pickup</span>
+                          </button>
+                          <p className="text-[9px] text-zinc-600 text-center mt-2">Coordinate pickup time and details with the seller</p>
+                        </motion.div>
+                      )}
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
+            </div>
+
+            {/* ─── Payment Method Selector ─── */}
+            <div className="mt-10">
+              <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-6 flex items-center gap-3">
+                <CreditCard className="w-5 h-5 text-safety-orange" />
+                Payment Method
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Cash on Delivery */}
+                <button
+                  id="payment-cod"
+                  onClick={() => setPaymentMethod('cod')}
+                  className={`relative text-left p-6 rounded-sm border-2 transition-all duration-200 group ${
+                    paymentMethod === 'cod'
+                      ? 'border-green-500 bg-green-500/5 shadow-lg shadow-green-500/10'
+                      : 'border-white/10 bg-zinc-900 hover:border-white/20'
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`w-12 h-12 rounded-sm flex items-center justify-center shrink-0 transition-colors ${
+                      paymentMethod === 'cod' ? 'bg-green-500 text-white' : 'bg-zinc-800 text-zinc-500 group-hover:text-white'
+                    }`}>
+                      <Banknote className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase tracking-tight mb-1">Cash on Delivery</h4>
+                      <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest leading-relaxed">
+                        Pay when you receive your order
+                      </p>
+                      <div className="mt-3 flex items-center gap-2">
+                        <span className="text-[9px] font-black text-green-500 uppercase tracking-widest bg-green-500/10 px-2 py-1 rounded-sm border border-green-500/20">
+                          Available
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  {paymentMethod === 'cod' && (
+                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute top-3 right-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    </motion.div>
+                  )}
+                </button>
+
+                {/* Paymongo GCash */}
+                <button
+                  id="payment-gcash"
+                  onClick={() => setPaymentMethod('gcash')}
+                  className={`relative text-left p-6 rounded-sm border-2 transition-all duration-200 group ${
+                    paymentMethod === 'gcash'
+                      ? 'border-blue-400 bg-blue-400/5 shadow-lg shadow-blue-400/10'
+                      : 'border-white/10 bg-zinc-900 hover:border-white/20'
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`w-12 h-12 rounded-sm flex items-center justify-center shrink-0 transition-colors ${
+                      paymentMethod === 'gcash' ? 'bg-blue-400 text-white' : 'bg-zinc-800 text-zinc-500 group-hover:text-white'
+                    }`}>
+                      <CreditCard className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase tracking-tight mb-1">GCash</h4>
+                      <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest leading-relaxed">
+                        Pay via Paymongo GCash
+                      </p>
+                      <div className="mt-3 flex items-center gap-2">
+                        <span className="text-[9px] font-black text-yellow-500 uppercase tracking-widest bg-yellow-500/10 px-2 py-1 rounded-sm border border-yellow-500/20">
+                          Integration Pending
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  {paymentMethod === 'gcash' && (
+                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute top-3 right-3">
+                      <CheckCircle2 className="w-5 h-5 text-blue-400" />
+                    </motion.div>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -370,7 +499,7 @@ export default function CartPage() {
 
                 {/* Delivery method summary */}
                 {deliveryMethod && (
-                  <div className="mb-6 p-3 rounded-sm border border-white/5 bg-zinc-800/50">
+                  <div className="mb-4 p-3 rounded-sm border border-white/5 bg-zinc-800/50">
                     <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Delivery</span>
                     {deliveryMethod === 'standard' ? (
                       <div className="flex items-center gap-2">
@@ -385,6 +514,26 @@ export default function CartPage() {
                     ) : (
                       <span className="text-xs text-yellow-500 font-bold">Select a pickup point</span>
                     )}
+                  </div>
+                )}
+
+                {/* Payment method summary */}
+                {paymentMethod && (
+                  <div className="mb-6 p-3 rounded-sm border border-white/5 bg-zinc-800/50">
+                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Payment</span>
+                    <div className="flex items-center gap-2">
+                      {paymentMethod === 'cod' ? (
+                        <>
+                          <Banknote className="w-3.5 h-3.5 text-green-500" />
+                          <span className="text-xs font-bold text-white">Cash on Delivery</span>
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="w-3.5 h-3.5 text-blue-400" />
+                          <span className="text-xs font-bold text-white">GCash (Paymongo)</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -404,6 +553,12 @@ export default function CartPage() {
                 {session && !deliveryMethod && (
                   <div className="mb-4 p-3 bg-yellow-950/30 border border-yellow-500/20 rounded-sm">
                     <p className="text-xs text-yellow-400 font-bold">Please select a delivery method below.</p>
+                  </div>
+                )}
+
+                {session && deliveryMethod && !paymentMethod && (
+                  <div className="mb-4 p-3 bg-yellow-950/30 border border-yellow-500/20 rounded-sm">
+                    <p className="text-xs text-yellow-400 font-bold">Please select a payment method below.</p>
                   </div>
                 )}
 

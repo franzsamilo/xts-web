@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
-import { Package, ShoppingCart, BarChart3, MessageCircle, Settings, Plus, Edit, Trash2, X, Activity, Upload, Check, Image as ImageIcon, Star } from 'lucide-react';
+import { Package, ShoppingCart, BarChart3, MessageCircle, Settings, Plus, Edit, Trash2, X, Activity, Upload, Check, Image as ImageIcon, Star, Banknote, CreditCard } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -418,6 +418,15 @@ export default function SellerDashboard() {
                       <p className="text-xs text-[var(--text-muted)] font-mono mb-1">#{order.id?.slice(0, 8).toUpperCase()}</p>
                       <h4 className="text-sm font-bold text-[var(--text-on-card)]">{order.customerName}</h4>
                       <p className="text-xs text-[var(--text-muted)]">{order.items?.length || 0} items · ₱{order.total?.toLocaleString()}</p>
+                      {order.paymentMethod && (
+                        <div className="flex items-center gap-1 mt-1">
+                          {order.paymentMethod === 'gcash' ? (
+                            <><CreditCard className="w-3 h-3 text-blue-400" /><span className="text-[10px] text-blue-400 font-bold uppercase">GCash</span></>
+                          ) : (
+                            <><Banknote className="w-3 h-3 text-green-500" /><span className="text-[10px] text-green-400 font-bold uppercase">COD</span></>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="flex flex-col items-end gap-2">
                       <Badge variant={

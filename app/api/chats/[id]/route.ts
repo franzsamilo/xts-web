@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMessages, addMessage, getChatById, deleteChat } from '@/lib/chat';
+import { getMessages, addMessage, getChatById, deleteChat, markChatAsRead } from '@/lib/chat';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await getServerSession(authOptions);
     const { id } = await params;
     const messages = await getMessages(id);
+
+    // Mark chat as read for the current user
+    if (session?.user?.email) {
+      markChatAsRead(id, session.user.email).catch(() => {});
+    }
+
     return NextResponse.json(messages);
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });

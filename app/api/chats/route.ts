@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getChatsByUser, createChat, findExistingChat, addMessage } from '@/lib/chat';
+import { getChatsByUser, createChat, findExistingChat, addMessage, getUnreadChatCount } from '@/lib/chat';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
@@ -10,6 +10,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
+    // Check if requesting unread count only
+    const { searchParams } = new URL(req.url);
+    if (searchParams.get('unreadCount') === 'true') {
+      const count = await getUnreadChatCount(session.user.email);
+      return NextResponse.json({ count });
+    }
+
     // Fetch user's own chats
     let chats = await getChatsByUser(session.user.email);
 
@@ -66,6 +73,7 @@ export async function POST(req: NextRequest) {
         [body.recipientId]: body.recipientName || 'Seller',
       },
       productRef: body.productRef || undefined,
+      pickupRef: body.pickupRef || undefined,
       type: body.type || 'product',
       lastMessage: body.initialMessage || '',
       createdAt: new Date(),

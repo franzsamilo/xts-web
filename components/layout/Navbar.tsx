@@ -25,6 +25,7 @@ export const Navbar = () => {
   const [mounted, setMounted] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const { cartCount } = useCart();
+  const [unreadChats, setUnreadChats] = useState(0);
 
   useEffect(() => {
     setMounted(true);
@@ -34,6 +35,20 @@ export const Navbar = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Poll for unread chats
+  useEffect(() => {
+    if (!session) return;
+    const fetchUnread = () => {
+      fetch('/api/chats?unreadCount=true')
+        .then(r => r.json())
+        .then(d => setUnreadChats(d.count || 0))
+        .catch(() => {});
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30000);
+    return () => clearInterval(interval);
+  }, [session]);
 
   const handleSignOut = async () => {
     setLoggingOut(true);
@@ -75,6 +90,9 @@ export const Navbar = () => {
 
           <Link href="/chat" className="hidden md:inline-flex relative p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors" title="Messages">
             <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+            {unreadChats > 0 && (
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[var(--nav-bg)] animate-pulse" />
+            )}
           </Link>
 
           <Link href="/cart" className="relative p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
@@ -202,10 +220,13 @@ export const Navbar = () => {
               <Link
                 href="/chat"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-4 text-lg font-black uppercase tracking-tighter text-[var(--text-primary)] hover:text-safety-orange transition-colors"
+                className="flex items-center gap-4 text-lg font-black uppercase tracking-tighter text-[var(--text-primary)] hover:text-safety-orange transition-colors relative"
               >
                 <MessageCircle className="w-5 h-5" />
                 Messages
+                {unreadChats > 0 && (
+                  <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                )}
               </Link>
 
               {session && ((session.user as any)?.role?.includes('admin') || (session.user as any)?.role?.includes('expert')) && (

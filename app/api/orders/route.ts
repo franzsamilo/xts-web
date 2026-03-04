@@ -43,6 +43,7 @@ export async function POST(req: Request) {
       deliveryMethod: body.deliveryMethod || 'standard',
       pickupPointId: body.pickupPointId || undefined,
       pickupPointName: body.pickupPointName || undefined,
+      paymentMethod: body.paymentMethod || 'cod',
       createdAt: new Date(),
     });
 

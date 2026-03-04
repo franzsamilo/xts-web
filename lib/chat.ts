@@ -19,9 +19,16 @@ export interface ChatData {
     price: number;
     imageUrl?: string;
   };
+  pickupRef?: {
+    pointId: string;
+    pointName: string;
+    pointAddress: string;
+  };
   lastMessage?: string;
   lastMessageAt?: Date | any;
-  type: 'product' | 'consultation' | 'support';
+  lastReadBy?: Record<string, string>; // email -> ISO timestamp
+  hasUnread?: boolean;
+  type: 'product' | 'consultation' | 'support' | 'pickup';
   createdAt: Date | any;
 }
 
@@ -33,12 +40,22 @@ export async function getChatsByUser(userId: string): Promise<ChatData[]> {
       .orderBy('lastMessageAt', 'desc')
       .get();
 
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
-      lastMessageAt: doc.data().lastMessageAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
-    })) as ChatData[];
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      const lastMessageAt = data.lastMessageAt?.toDate?.()?.toISOString?.() || new Date().toISOString();
+      const lastReadBy = data.lastReadBy || {};
+      const userLastRead = lastReadBy[userId];
+      const hasUnread = !userLastRead || new Date(lastMessageAt) > new Date(userLastRead);
+
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
+        lastMessageAt,
+        lastReadBy,
+        hasUnread: data.lastMessage ? hasUnread : false,
+      };
+    }) as ChatData[];
   } catch (error) {
     console.error('Error fetching chats:', error);
     return [];
@@ -142,4 +159,21 @@ export async function deleteChat(chatId: string): Promise<void> {
   await batch.commit();
   // Delete the chat document
   await adminDb.collection('chats').doc(chatId).delete();
+}
+
+export async function markChatAsRead(chatId: string, userId: string): Promise<void> {
+  const now = new Date().toISOString();
+  await adminDb.collection('chats').doc(chatId).update({
+    [`lastReadBy.${userId}`]: now,
+  });
+}
+
+export async function getUnreadChatCount(userId: string): Promise<number> {
+  try {
+    const chats = await getChatsByUser(userId);
+    return chats.filter(c => c.hasUnread).length;
+  } catch (error) {
+    console.error('Error getting unread count:', error);
+    return 0;
+  }
 }

@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input, Textarea } from '@/components/ui/Input';
+import { DateTimePicker } from '@/components/ui/DateTimePicker';
 import { Calendar, Clock, Star, Video, MessageSquare, ShieldCheck, X, CheckCircle2, Activity, FileText, Cpu, PenTool, Wrench, ArrowRight } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 
@@ -17,28 +18,24 @@ const consultationOptions = [
     name: 'CAD & Design Review',
     icon: PenTool,
     description: 'Get expert feedback on your mechanical designs, assembly layouts, and manufacturing feasibility. Supports SolidWorks, Fusion 360, and AutoCAD.',
-    price: 'From PHP 2,500/session',
   },
   {
     id: 'firmware-debug',
     name: 'Firmware & Code Debug',
     icon: Cpu,
     description: 'Debug embedded systems, optimize firmware performance, and resolve hardware-software integration issues. Covers Arduino, STM32, ESP32, and ROS.',
-    price: 'From PHP 2,000/session',
   },
   {
     id: 'hardware-design',
     name: 'Hardware & PCB Design',
     icon: Wrench,
     description: 'Circuit design consultation, PCB layout optimization, component selection, and signal integrity analysis using Altium and KiCad.',
-    price: 'From PHP 3,000/session',
   },
   {
     id: 'general',
     name: 'General Engineering',
     icon: FileText,
     description: 'Broad technical consultation for project planning, feasibility studies, material selection, and manufacturing process optimization.',
-    price: 'From PHP 1,500/session',
   },
 ];
 
@@ -50,9 +47,9 @@ export default function ConsultationPage() {
     projectDescription: '',
     requiredSkills: '',
     budget: '',
-    timeline: '',
-    attachments: '',
   });
+  const [scheduleStart, setScheduleStart] = useState({ date: '', time: '' });
+  const [scheduleEnd, setScheduleEnd] = useState({ date: '', time: '' });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
@@ -61,14 +58,17 @@ export default function ConsultationPage() {
     setSubmitting(true);
     try {
       const option = consultationOptions.find(o => o.id === selectedOption);
+      const timeline = scheduleStart.date
+        ? `${scheduleStart.date} ${scheduleStart.time} — ${scheduleEnd.date} ${scheduleEnd.time}`
+        : 'Flexible';
       const res = await fetch('/api/consultations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           expertName: 'Pending Assignment',
           expertTitle: option?.name || formData.specialty,
-          expertPrice: option?.price || formData.budget,
-          slot: formData.timeline || 'TBD',
+          expertPrice: formData.budget || 'TBD',
+          slot: timeline,
           consultationType: selectedOption,
           projectDescription: formData.projectDescription,
           requiredSkills: formData.requiredSkills,
@@ -79,7 +79,9 @@ export default function ConsultationPage() {
         setTimeout(() => {
           setSubmitted(false);
           setSelectedOption(null);
-          setFormData({ specialty: '', projectDescription: '', requiredSkills: '', budget: '', timeline: '', attachments: '' });
+          setFormData({ specialty: '', projectDescription: '', requiredSkills: '', budget: '' });
+          setScheduleStart({ date: '', time: '' });
+          setScheduleEnd({ date: '', time: '' });
         }, 3000);
       }
     } catch (e) {
@@ -128,8 +130,7 @@ export default function ConsultationPage() {
                       </div>
                       <h4 className="text-lg font-black text-[var(--text-on-card)] uppercase mb-2">{option.name}</h4>
                       <p className="text-xs text-[var(--text-muted)] leading-relaxed mb-4">{option.description}</p>
-                      <div className="flex items-center justify-between pt-3 border-t border-[var(--border-secondary)]">
-                        <span className="text-sm font-black text-safety-orange">{option.price}</span>
+                      <div className="flex items-center justify-end pt-3 border-t border-[var(--border-secondary)]">
                         <ArrowRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-safety-orange group-hover:translate-x-1 transition-all" />
                       </div>
                     </Card>
@@ -213,7 +214,6 @@ export default function ConsultationPage() {
                         </div>
                         <div>
                           <h3 className="text-xl font-black text-[var(--text-on-card)] uppercase">{opt?.name}</h3>
-                          <p className="text-xs text-[var(--text-muted)]">{opt?.price}</p>
                         </div>
                       </>
                     );
@@ -261,15 +261,17 @@ export default function ConsultationPage() {
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest">Preferred Timeline</label>
-                  <Input
-                    placeholder="e.g., Within this week, ASAP, Flexible"
-                    className="bg-[var(--bg-input)] border-[var(--border-primary)] text-[var(--text-on-input)] text-sm h-10"
-                    value={formData.timeline}
-                    onChange={e => setFormData({ ...formData, timeline: e.target.value })}
-                  />
-                </div>
+                <DateTimePicker
+                  label="Preferred Schedule"
+                  startDate={scheduleStart.date}
+                  startTime={scheduleStart.time}
+                  endDate={scheduleEnd.date}
+                  endTime={scheduleEnd.time}
+                  onStartDateChange={(v) => setScheduleStart(p => ({ ...p, date: v }))}
+                  onStartTimeChange={(v) => setScheduleStart(p => ({ ...p, time: v }))}
+                  onEndDateChange={(v) => setScheduleEnd(p => ({ ...p, date: v }))}
+                  onEndTimeChange={(v) => setScheduleEnd(p => ({ ...p, time: v }))}
+                />
 
                 <div className="flex flex-col sm:flex-row gap-3 pt-4">
                   <Button variant="outline" className="flex-1" onClick={() => setSelectedOption(null)}>Cancel</Button>

@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input, Textarea } from '@/components/ui/Input';
-import { MessageSquare, ThumbsUp, Share2, Pin, CheckCircle2, X, Activity, Send } from 'lucide-react';
+import { MessageSquare, ThumbsUp, Share2, Pin, CheckCircle2, X, Activity, Send, Upload, Image as ImageIcon } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 
 interface Comment {
@@ -30,6 +30,7 @@ interface Post {
   likedBy?: string[];
   comments: number;
   isPinned: boolean;
+  imageUrls?: string[];
   createdAt?: string;
 }
 
@@ -57,6 +58,11 @@ export default function CommunityPage() {
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [likingIds, setLikingIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
+
+  // Image upload state
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   // Comment state
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
@@ -96,21 +102,62 @@ export default function CommunityPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setImageFiles(prev => [...prev, ...files]);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreviews(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+
+  const removeImage = (index: number) => {
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handlePublish = async () => {
     if (!postTitle.trim() || !postContent.trim()) return;
     setPublishing(true);
     try {
+      // Upload images first
+      const uploadedUrls: string[] = [];
+      if (imageFiles.length > 0) {
+        setUploading(true);
+        for (const file of imageFiles) {
+          const fd = new FormData();
+          fd.append('file', file);
+          const res = await fetch('/api/upload', { method: 'POST', body: fd });
+          if (res.ok) {
+            const data = await res.json();
+            uploadedUrls.push(data.url);
+          }
+        }
+        setUploading(false);
+      }
+
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: postTitle.trim(), content: postContent.trim(), tag: postTag }),
+        body: JSON.stringify({
+          title: postTitle.trim(),
+          content: postContent.trim(),
+          tag: postTag,
+          imageUrls: uploadedUrls,
+        }),
       });
       if (res.ok) {
         const newPost = await res.json();
-        setPosts(prev => [{ ...newPost, createdAt: new Date().toISOString() }, ...prev]);
+        setPosts(prev => [{ ...newPost, createdAt: new Date().toISOString(), imageUrls: uploadedUrls }, ...prev]);
         setPostTitle('');
         setPostContent('');
         setPostTag('Build Log');
+        setImageFiles([]);
+        setImagePreviews([]);
         setShowCreate(false);
         showToast('Post published successfully!');
       }
@@ -118,6 +165,7 @@ export default function CommunityPage() {
       showToast('Failed to publish. Try again.');
     } finally {
       setPublishing(false);
+      setUploading(false);
     }
   };
 
@@ -152,7 +200,6 @@ export default function CommunityPage() {
     next.add(postId);
     setExpandedComments(next);
 
-    // Fetch comments if not already loaded
     if (!commentsByPost[postId]) {
       setLoadingComments(prev => new Set(prev).add(postId));
       try {
@@ -197,6 +244,15 @@ export default function CommunityPage() {
   };
 
   const tagOptions = ['Build Log', 'Question', 'Discussion', 'Showcase', 'Tutorial'];
+
+  // Compute actual top contributors from posts
+  const contributorMap = new Map<string, number>();
+  posts.forEach(p => {
+    contributorMap.set(p.author, (contributorMap.get(p.author) || 0) + 1);
+  });
+  const topContributors = Array.from(contributorMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4);
 
   return (
     <PageShell>
@@ -249,13 +305,34 @@ export default function CommunityPage() {
                       </div>
                       <Input placeholder="Post Title" className="bg-white border-zinc-200 text-esd-dark" value={postTitle} onChange={(e) => setPostTitle(e.target.value)} />
                       <Textarea placeholder="What are you building?..." className="bg-white border-zinc-200 text-esd-dark min-h-[120px]" value={postContent} onChange={(e) => setPostContent(e.target.value)} />
+
+                      {/* Photo Upload */}
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Photos</label>
+                        <div className="flex flex-wrap gap-3">
+                          {imagePreviews.map((url, i) => (
+                            <div key={i} className="relative w-20 h-20 rounded-sm overflow-hidden border-2 border-safety-orange">
+                              <img src={url} alt="" className="w-full h-full object-cover" />
+                              <button onClick={() => removeImage(i)} className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center">
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                          <label className="w-20 h-20 border-2 border-dashed border-zinc-300 rounded-sm flex flex-col items-center justify-center cursor-pointer hover:border-safety-orange transition-colors">
+                            <ImageIcon className="w-5 h-5 text-zinc-400 mb-1" />
+                            <span className="text-[8px] text-zinc-400 font-bold">ADD</span>
+                            <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageSelect} />
+                          </label>
+                        </div>
+                      </div>
+
                       <div className="flex justify-between items-center">
                         <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Posting as @{session?.user?.name?.split(' ')[0] || 'Anonymous'}</span>
                         <div className="flex gap-4">
-                          <Button variant="ghost" className="text-zinc-500" onClick={() => { setShowCreate(false); setPostTitle(''); setPostContent(''); }}>Cancel</Button>
+                          <Button variant="ghost" className="text-zinc-500" onClick={() => { setShowCreate(false); setPostTitle(''); setPostContent(''); setImageFiles([]); setImagePreviews([]); }}>Cancel</Button>
                           <Button onClick={handlePublish} disabled={!postTitle.trim() || !postContent.trim() || publishing}
                             className="shadow-[0_4px_0_0_#995400] active:translate-y-[2px] active:shadow-none transition-all">
-                            {publishing ? 'Publishing...' : 'Publish Post'}
+                            {publishing ? (uploading ? 'Uploading Photos...' : 'Publishing...') : 'Publish Post'}
                           </Button>
                         </div>
                       </div>
@@ -290,7 +367,22 @@ export default function CommunityPage() {
                               <span className="text-xs font-bold text-zinc-500 uppercase tracking-tighter">@{post.author} • {timeAgo(post.createdAt)}</span>
                             </div>
                             <h3 className="text-2xl font-black text-esd-dark uppercase mb-4 group-hover:text-safety-orange transition-colors cursor-pointer">{post.title}</h3>
-                            <p className="text-zinc-600 mb-8 leading-relaxed whitespace-pre-wrap">{post.content}</p>
+                            <p className="text-zinc-600 mb-4 leading-relaxed whitespace-pre-wrap">{post.content}</p>
+
+                            {/* Post Images */}
+                            {post.imageUrls && post.imageUrls.length > 0 && (
+                              <div className={`mb-6 grid gap-2 ${
+                                post.imageUrls.length === 1 ? 'grid-cols-1' :
+                                post.imageUrls.length === 2 ? 'grid-cols-2' :
+                                'grid-cols-2 sm:grid-cols-3'
+                              }`}>
+                                {post.imageUrls.map((url, i) => (
+                                  <div key={i} className="rounded-sm overflow-hidden border border-black/5 aspect-video">
+                                    <img src={url} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
 
                             <div className="flex items-center gap-8 pt-6 border-t border-black/5">
                               {/* Like */}
@@ -409,15 +501,19 @@ export default function CommunityPage() {
             <div className="p-8 bg-zinc-900 border border-white/5 rounded-sm shadow-2xl">
               <h4 className="text-lg font-black text-white uppercase mb-6 tracking-tighter">Top Contributors</h4>
               <div className="space-y-4">
-                {['RobotDave', 'CircuitQueen', 'TechLead', 'FabMaster'].map((user, i) => (
-                  <div key={user} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-zinc-800 rounded-full flex items-center justify-center text-[10px] font-black">{user[0]}</div>
-                      <span className="text-sm font-bold text-zinc-400">@{user}</span>
+                {topContributors.length > 0 ? (
+                  topContributors.map(([user, count], i) => (
+                    <div key={user} className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-zinc-800 rounded-full flex items-center justify-center text-[10px] font-black text-white">{user[0]?.toUpperCase()}</div>
+                        <span className="text-sm font-bold text-zinc-400">@{user}</span>
+                      </div>
+                      <Badge variant="new" className="text-[8px] px-1 pointer-events-none">{count} post{count !== 1 ? 's' : ''}</Badge>
                     </div>
-                    <Badge variant="new" className="text-[8px] px-1 pointer-events-none">Rank {i + 1}</Badge>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-xs text-zinc-500 italic">No contributors yet.</p>
+                )}
               </div>
             </div>
 
