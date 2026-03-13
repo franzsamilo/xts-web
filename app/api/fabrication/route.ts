@@ -36,6 +36,7 @@ export async function POST(req: Request) {
     const job = await createJob({
       name: body.name,
       files: body.files,
+      fileUrls: body.fileUrls || [],
       status: 'queued',
       progress: 0,
       customerName: session.user?.name || 'Unknown',

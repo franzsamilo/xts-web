@@ -64,6 +64,7 @@ export default function Home() {
       category: product.category,
       sku: product.sku,
       tag: product.tag,
+      imageUrl: product.imageUrls?.[0] || '',
     });
     setAddedIds(prev => new Set(prev).add(product.id));
     setTimeout(() => {
@@ -135,8 +136,12 @@ export default function Home() {
               {products.map((p) => (
                 <Card key={p.id} annotation={p.tag} className="flex flex-col h-full">
                   <Link href={`/shop/${p.id}`} className="group block">
-                    <div className="aspect-square bg-zinc-200 mb-4 rounded-sm flex items-center justify-center relative overflow-hidden">
-                      <Box className="w-20 h-20 text-zinc-400 opacity-50 group-hover:scale-110 transition-transform duration-500" />
+                    <div className="aspect-square bg-[var(--bg-surface)] mb-4 rounded-sm flex items-center justify-center relative overflow-hidden border border-[var(--border-secondary)]">
+                      {p.imageUrls?.[0] ? (
+                        <img src={p.imageUrls[0]} alt={p.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                      ) : (
+                        <Box className="w-20 h-20 text-zinc-400 opacity-50 group-hover:scale-110 transition-transform duration-500" />
+                      )}
                       <div className="absolute top-2 right-2">
                         <Badge variant={p.stock < 10 ? 'warning' : 'new'}>
                           {p.stock < 10 ? 'Low Stock' : 'In Stock'}

@@ -326,13 +326,20 @@ function ServicesContent() {
                     <p className="mt-2 text-xs text-red-500 font-bold">{fileError}</p>
                   )}
                   {files.length > 0 && (
-                    <div className="mt-3 space-y-1">
+                    <div className="mt-6 flex flex-col gap-2">
                       {files.map((f, i) => (
-                        <div key={i} className="text-xs text-[var(--text-on-input)] flex items-center gap-2 justify-center">
-                          <span>{f.name}</span>
-                          <span className="text-[var(--text-muted)]">({(f.size / 1024 / 1024).toFixed(2)} MB)</span>
-                          <button onClick={() => setFiles(files.filter((_, j) => j !== i))} className="text-red-500">
-                            <X className="w-3 h-3" />
+                        <div key={i} className="bg-[var(--bg-surface)] border border-[var(--border-primary)] rounded-sm p-3 flex items-center justify-between shadow-sm">
+                          <div className="flex items-center gap-3 overflow-hidden">
+                            <div className="w-8 h-8 rounded-sm bg-safety-orange/10 flex items-center justify-center shrink-0">
+                              <Upload className="w-4 h-4 text-safety-orange" />
+                            </div>
+                            <div className="min-w-0 text-left">
+                              <p className="text-sm font-bold text-[var(--text-primary)] truncate">{f.name}</p>
+                              <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest">{(f.size / 1024 / 1024).toFixed(2)} MB</p>
+                            </div>
+                          </div>
+                          <button onClick={() => setFiles(files.filter((_, j) => j !== i))} className="p-2 text-[var(--text-muted)] hover:text-red-500 hover:bg-red-500/10 rounded-sm transition-colors shrink-0">
+                            <X className="w-4 h-4" />
                           </button>
                         </div>
                       ))}

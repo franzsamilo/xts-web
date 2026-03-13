@@ -65,6 +65,7 @@ export default function ChatPage() {
 
   const openChat = async (chat: Chat) => {
     setSelectedChat(chat);
+    setChats(prev => prev.map(c => c.id === chat.id ? { ...c, hasUnread: false } : c));
     setLoadingMessages(true);
     try {
       const res = await fetch(`/api/chats/${chat.id}`);
@@ -178,7 +179,7 @@ export default function ChatPage() {
       <div className="container mx-auto px-4 py-16 sm:py-20">
         <SectionHeading title="Messages" annotation="Chat & Support" dark={true} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" style={{ height: '70vh' }}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)] min-h-[500px]">
           {/* Chat List — scrollable, contained */}
           <div className={`flex flex-col h-full overflow-hidden border border-[var(--border-primary)] rounded-sm bg-[var(--bg-secondary)] ${selectedChat ? 'hidden lg:flex' : ''}`}>
             <div className="p-3 border-b border-[var(--border-primary)] bg-[var(--bg-surface)]">
@@ -280,7 +281,7 @@ export default function ChatPage() {
                 </div>
 
                 {/* Messages */}
-                <div ref={messagesContainerRef} className="flex-grow overflow-y-auto p-4 space-y-4">
+                <div ref={messagesContainerRef} className="flex-grow flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
                   {loadingMessages ? (
                     <div className="py-10 flex justify-center"><Activity className="w-6 h-6 text-safety-orange animate-spin" /></div>
                   ) : messages.length > 0 ? (

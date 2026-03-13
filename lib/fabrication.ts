@@ -4,6 +4,7 @@ export interface FabJobData {
   id?: string;
   name: string;         // Job title derived from file names
   files: string[];      // File names submitted
+  fileUrls?: string[];  // Cloud storage URLs for download
   status: string;       // queued, reviewing, in-progress, completed
   progress: number;     // 0-100
   customerName: string;

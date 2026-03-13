@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { Package, Users, Activity, Settings, Plus, Search, Hammer, AlertTriangle, MessageCircle, X, ClipboardList, Truck, CheckCircle2, ArrowUpDown, MapPin, Trash2, Edit2 } from 'lucide-react';
+import { Package, Users, Activity, Settings, Plus, Search, Hammer, AlertTriangle, MessageCircle, X, ClipboardList, Truck, CheckCircle2, ArrowUpDown, MapPin, Trash2, Edit2, Download } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { useSession } from 'next-auth/react';
@@ -21,7 +21,7 @@ function AdminPanel() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get('tab') || 'inventory';
+  const initialTab = searchParams.get('tab') || 'orders';
 
   // State for live mock interaction
   const [inventory, setInventory] = React.useState<any[]>([]);
@@ -415,11 +415,9 @@ function AdminPanel() {
           <TabsList className="mb-12 flex flex-wrap gap-2 bg-zinc-900 border border-white/10 p-1 rounded-sm inline-flex">
             {userRole.includes('admin') && (
               <>
-                <AdminTabTrigger value="inventory" icon={Package} label="Products" />
                 <AdminTabTrigger value="orders" icon={Activity} label="Orders" />
                 <AdminTabTrigger value="fabrication" icon={Hammer} label="Fabrication" />
                 <AdminTabTrigger value="pickuppoints" icon={MapPin} label="Pickup Points" />
-                <AdminTabTrigger value="applications" icon={Plus} label="Intake" />
                 <AdminTabTrigger value="users" icon={Users} label="Permissions" />
               </>
             )}
@@ -428,123 +426,6 @@ function AdminPanel() {
 
           {userRole.includes('admin') && (
             <>
-
-              <TabsContent value="inventory" className="space-y-8 mt-0">
-                <div className="flex flex-col md:flex-row gap-6 justify-between items-center mb-10">
-                   <div className="relative w-full md:w-96">
-                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                      <Input placeholder="Search inventory..." className="pl-12 bg-zinc-900 border-zinc-800" />
-                   </div>
-                   <Button className="w-full md:w-auto flex gap-2" onClick={() => setShowAddForm(!showAddForm)}>
-                     {showAddForm ? <AlertTriangle className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                     {showAddForm ? 'Cancel Entry' : 'Add New Item'}
-                   </Button>
-                </div>
-
-                {showAddForm && (
-                  <Card className="border-2 border-safety-orange/20 overflow-hidden bg-black/40 mb-10">
-                    <form onSubmit={handleAddProduct} className="p-8 space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Model Name</label>
-                          <Input required placeholder="Industrial Servo" className="bg-zinc-900 border-zinc-800" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Serial / SKU</label>
-                          <Input required placeholder="XTS-SRV-001" className="bg-zinc-900 border-zinc-800" value={newProduct.sku} onChange={e => setNewProduct({...newProduct, sku: e.target.value})} />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Category</label>
-                          <select className="flex h-10 w-full rounded-sm border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-safety-orange appearance-none" value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})}>
-                            {['Hardware', 'Robotics', 'Motion', 'Power', 'Sensors', 'Electronics'].map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">MSRP (PHP)</label>
-                          <Input required type="number" step="0.01" className="bg-zinc-900 border-zinc-800" value={newProduct.price || ''} onChange={e => setNewProduct({...newProduct, price: parseFloat(e.target.value) || 0})} />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Initial Logic Stock</label>
-                          <Input required type="number" className="bg-zinc-900 border-zinc-800" value={newProduct.stock || ''} onChange={e => setNewProduct({...newProduct, stock: parseInt(e.target.value) || 0})} />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Status Tag</label>
-                          <Input placeholder="NEW ARRIVAL" className="bg-zinc-900 border-zinc-800" value={newProduct.tag} onChange={e => setNewProduct({...newProduct, tag: e.target.value})} />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Technical Specifications</label>
-                        <Textarea required placeholder="Describe torque, voltage, material, or architectural specs..." className="bg-zinc-900 border-zinc-800 min-h-[100px]" value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} />
-                      </div>
-
-                      <div className="flex justify-end">
-                        <Button type="submit" disabled={addingProduct} className="bg-red-600 hover:bg-red-700 h-12 px-10 uppercase text-xs font-black shadow-[0_4px_0_0_#991b1b]">
-                          {addingProduct ? 'Manifesting...' : 'Add to Inventory'}
-                        </Button>
-                      </div>
-                    </form>
-                  </Card>
-                )}
-
-                {loadingInventory ? (
-                  <div className="py-20 flex justify-center"><Activity className="w-8 h-8 text-safety-orange animate-spin" /></div>
-                ) : inventory.length > 0 ? (
-                  <div className="overflow-x-auto border border-white/5 rounded-sm bg-black/20">
-                     <table className="w-full text-left border-collapse">
-                        {/* ... table content remains same ... */}
-                        <thead>
-                          <tr className="border-b border-white/10 bg-zinc-900/50">
-                            <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest">Model / Name</th>
-                            <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest">Serial</th>
-                            <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest">Qty</th>
-                            <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest">MSRP</th>
-                            <th className="p-4 font-black uppercase text-[10px] text-zinc-500 tracking-widest text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {inventory.map((item: any) => (
-                            <tr key={item.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                              {/* ... row data ... */}
-                              <td className="p-4">
-                               <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 bg-zinc-800 rounded-sm border border-white/10 flex items-center justify-center">
-                                    <Package className="w-5 h-5 text-zinc-600" />
-                                  </div>
-                                  <span className="text-sm font-bold text-white uppercase tracking-tighter">{item.name}</span>
-                               </div>
-                            </td>
-                            <td className="p-4 text-xs font-mono text-zinc-400">{item.sku}</td>
-                            <td className="p-4">
-                               <div className="flex items-center gap-2">
-                                  <span className="text-white font-bold">{item.stock}</span>
-                                  {item.stock < 15 && <Badge variant="warning" className="text-[8px] h-4">RESTOCK</Badge>}
-                               </div>
-                            </td>
-                             <td className="p-4 text-sm font-black text-safety-orange">PHP {item.price.toFixed(2)}</td>
-                            <td className="p-4 text-right">
-                               <div className="flex gap-2 justify-end">
-                                   <Button variant="outline" size="sm" className="px-2 h-8 min-w-0" onClick={() => setEditingProduct({...item})}>Edit</Button>
-                                   <Button variant="ghost" size="sm" className="px-2 h-8 min-w-0 text-red-500" onClick={() => deleteProduct(item.id)}>Delete</Button>
-                               </div>
-                            </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                     </table>
-                  </div>
-                ) : (
-                  <EmptyTerminalState 
-                    icon={Package} 
-                    title="Inventory Empty" 
-                    description="No products are registered in the store database." 
-                  />
-                )}
-              </TabsContent>
-
               {/* Orders Management */}
               <TabsContent value="orders" className="space-y-8 mt-0">
                 <div className="mb-10">
@@ -717,47 +598,6 @@ function AdminPanel() {
                 )}
               </TabsContent>
 
-              {/* Expert Intake Management */}
-              <TabsContent value="applications" className="space-y-8 mt-0">
-                <div className="mb-10">
-                   <h3 className="text-2xl font-black uppercase text-white tracking-tighter">Specialist Intake</h3>
-                   <p className="text-zinc-500 text-xs font-medium uppercase tracking-widest mt-1">Pending Professional Verifications</p>
-                </div>
-
-                {applications.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {applications.map((app) => (
-                        <Card key={app.id} className="relative border border-white/5 hover:border-safety-orange/50 transition-colors bg-black/40">
-                          <div className="flex justify-between items-start mb-6">
-                             <div>
-                                <Badge variant="new" className="mb-2">EXPERT APPLICATION</Badge>
-                                <h4 className="text-xl font-black text-white uppercase tracking-tight">{app.name}</h4>
-                                <p className="text-xs text-zinc-500 font-mono mt-1">Reference: {app.id}</p>
-                             </div>
-                             <Badge variant="pending" className="bg-zinc-900 text-zinc-500 border-zinc-800">{app.status}</Badge>
-                          </div>
-                          
-                          <div className="bg-zinc-900 p-4 rounded-sm border border-white/5 mb-6">
-                             <span className="text-[10px] font-black uppercase text-zinc-600 tracking-widest block mb-1">Stated Expertise</span>
-                             <p className="text-sm text-zinc-300 font-medium tracking-tight uppercase">{app.expertise}</p>
-                          </div>
-
-                          <div className="flex gap-4">
-                              <Button className="flex-grow bg-green-600 hover:bg-green-700 h-10 uppercase text-[10px] shadow-[0_4px_0_0_#166534]" onClick={() => approveExpert(app.id)}>Verify & Admit</Button>
-                              <Button variant="outline" className="flex-grow h-10 uppercase text-[10px] border-red-500/50 text-red-500 hover:bg-red-500/10" onClick={() => declineExpert(app.id)}>Decline</Button>
-                          </div>
-                        </Card>
-                      ))}
-                  </div>
-                ) : (
-                  <div className="py-24 border-2 border-dashed border-white/5 rounded-sm flex flex-col items-center justify-center text-center bg-black/10">
-                     <Users className="w-12 h-12 text-zinc-800 mb-4" />
-                     <h4 className="text-lg font-black text-white uppercase tracking-tighter">Queue Nominal</h4>
-                     <p className="text-xs text-zinc-500 max-w-xs font-medium uppercase mt-1">All engineering applications have been processed.</p>
-                  </div>
-                )}
-              </TabsContent>
-
               {/* Fabrication Management */}
               <TabsContent value="fabrication" className="space-y-8 mt-0">
                 <div className="mb-10">
@@ -772,11 +612,82 @@ function AdminPanel() {
                     {fabJobs.map((job: any) => (
                       <Card key={job.id} className="border border-white/5 bg-black/40">
                         <div className="flex justify-between items-start mb-4">
-                          <div>
+                          <div className="flex-grow min-w-0 pr-4">
                             <Badge variant="new" className="mb-2 uppercase text-[8px]">{job.id?.slice(0, 8)}</Badge>
                             <h4 className="text-lg font-black text-white uppercase tracking-tight">{job.name}</h4>
-                            <p className="text-xs text-zinc-500 font-medium mt-1">Client: {job.customerName}</p>
-                            {job.files && <p className="text-[10px] text-zinc-600 font-mono mt-1">{job.files.join(', ')}</p>}
+                            <p className="text-xs text-zinc-500 font-black mt-1 uppercase tracking-widest">Client: <span className="text-white bg-black/50 px-2 py-0.5 rounded-sm">{job.customerName}</span></p>
+                            
+                            {/* Downloadable Files */}
+                            {job.files && job.files.length > 0 && (
+                              <div className="mt-4 flex flex-col gap-3">
+                                <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest border-b border-white/5 pb-2">Design Files</span>
+                                {job.files.map((file: string, idx: number) => {
+                                  // Fallback to # if the backend hasn't resolved fileUrl mappings
+                                  const downloadUrl = (job.fileUrls && job.fileUrls[idx]) ? job.fileUrls[idx] : '#';
+                                  return (
+                                    <div key={idx} className="flex items-center justify-between p-3 bg-zinc-900 border border-white/10 rounded-sm shadow-sm relative overflow-hidden group">
+                                      {/* background hover effect */}
+                                      <div className="absolute inset-0 bg-white/[0.02] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                                      
+                                      <div className="flex items-center gap-3 overflow-hidden z-10 w-full pr-4">
+                                        <div className="w-10 h-10 rounded-sm bg-safety-orange/10 flex items-center justify-center shrink-0 border border-safety-orange/20">
+                                          <Download className="w-5 h-5 text-safety-orange" />
+                                        </div>
+                                        <div className="min-w-0 flex-grow pr-4">
+                                          <p className="text-sm font-black text-white truncate" title={file}>{file}</p>
+                                          <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">Ready for Download</p>
+                                        </div>
+                                        <a 
+                                          href={downloadUrl} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer" 
+                                          onClick={(e) => {
+                                            if (downloadUrl === '#') {
+                                              e.preventDefault();
+                                              const blob = new Blob([`[SIMULATED FILE]\nFilename: ${file}\n\nThis file was uploaded as a mock or before Cloud Storage was linked. Please check administrative records for the actual file.`], { type: 'text/plain' });
+                                              const url = URL.createObjectURL(blob);
+                                              const a = document.createElement('a');
+                                              a.href = url;
+                                              a.download = file.includes('.') ? file : file + '.txt';
+                                              document.body.appendChild(a);
+                                              a.click();
+                                              document.body.removeChild(a);
+                                              URL.revokeObjectURL(url);
+                                            }
+                                          }}
+                                          className="z-10 shrink-0 px-6 py-3 bg-safety-orange hover:bg-safety-orange/90 text-white text-[10px] font-black uppercase tracking-widest rounded-sm shadow-[0_4px_0_0_#995400] active:translate-y-[4px] active:shadow-none transition-all flex items-center gap-2 border border-orange-400"
+                                        >
+                                          <Download className="w-4 h-4" /> Download
+                                        </a>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Service Parameters */}
+                            {job.parameters && Object.keys(job.parameters).length > 0 && (
+                              <div className="mt-4 bg-zinc-900/80 border border-white/5 rounded-sm p-3.5 w-full">
+                                <p className="text-[9px] text-zinc-500 font-black uppercase tracking-widest border-b border-white/5 pb-2 mb-3">Service Parameters</p>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                                  {Object.entries(job.parameters).map(([k, v]) => (
+                                    <div key={k} className="flex flex-col">
+                                      <span className="text-[8px] font-black tracking-widest uppercase text-zinc-600">{k}</span>
+                                      <span className="text-xs font-bold text-zinc-200 mt-0.5 break-words">{String(v)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Notes */}
+                            {job.notes && (
+                              <div className="mt-3 bg-yellow-950/20 border border-yellow-900/50 p-3 rounded-sm">
+                                <p className="text-[9px] text-yellow-600/60 font-black uppercase tracking-widest mb-1.5">Client Notes</p>
+                                <p className="text-xs text-yellow-500/90 italic leading-relaxed break-words">"{job.notes}"</p>
+                              </div>
+                            )}
                           </div>
                           <Badge variant={job.status === 'completed' ? 'completed' : job.status === 'in-progress' ? 'in-progress' : 'pending'}>
                             {(job.status || 'queued').toUpperCase()}
@@ -958,64 +869,6 @@ function AdminPanel() {
           </TabsContent>
         </Tabs>
       </div>
-
-      {/* Edit Product Modal */}
-      <AnimatePresence>
-        {editingProduct && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !savingEdit && setEditingProduct(null)}>
-            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-white/10 rounded-sm shadow-2xl max-w-lg w-full overflow-hidden">
-              <div className="bg-red-600 p-1">
-                <div className="bg-zinc-900 p-6 flex items-center justify-between">
-                  <h3 className="text-xl font-black text-white uppercase tracking-tighter">Edit Product</h3>
-                  <button onClick={() => setEditingProduct(null)} className="text-zinc-500 hover:text-white"><X className="w-5 h-5" /></button>
-                </div>
-              </div>
-              <div className="p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Name</label>
-                    <Input className="bg-zinc-800 border-zinc-700" value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">SKU</label>
-                    <Input className="bg-zinc-800 border-zinc-700" value={editingProduct.sku} onChange={e => setEditingProduct({...editingProduct, sku: e.target.value})} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Price (PHP)</label>
-                    <Input type="number" step="0.01" className="bg-zinc-800 border-zinc-700" value={editingProduct.price || ''} onChange={e => setEditingProduct({...editingProduct, price: parseFloat(e.target.value) || 0})} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Stock</label>
-                    <Input type="number" className="bg-zinc-800 border-zinc-700" value={editingProduct.stock || ''} onChange={e => setEditingProduct({...editingProduct, stock: parseInt(e.target.value) || 0})} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Category</label>
-                    <select className="flex h-10 w-full rounded-sm border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-safety-orange appearance-none" value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})}>
-                      {['Hardware', 'Robotics', 'Motion', 'Power', 'Sensors', 'Electronics'].map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Tag</label>
-                  <Input className="bg-zinc-800 border-zinc-700" value={editingProduct.tag || ''} onChange={e => setEditingProduct({...editingProduct, tag: e.target.value})} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Description</label>
-                  <Textarea className="bg-zinc-800 border-zinc-700 min-h-[80px]" value={editingProduct.description || ''} onChange={e => setEditingProduct({...editingProduct, description: e.target.value})} />
-                </div>
-              </div>
-              <div className="p-6 pt-0 flex gap-4">
-                <Button variant="outline" className="flex-1" onClick={() => setEditingProduct(null)}>Cancel</Button>
-                <Button className="flex-1 bg-red-600 hover:bg-red-700" onClick={handleEditProduct} disabled={savingEdit}>
-                  {savingEdit ? 'Saving...' : 'Save Changes'}
-                </Button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Audit Logs Modal */}
       <AnimatePresence>
