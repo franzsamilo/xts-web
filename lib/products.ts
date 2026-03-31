@@ -24,7 +24,7 @@ export interface ProductData {
 
 export async function getAllProducts(): Promise<ProductData[]> {
   try {
-    const snapshot = await adminDb.collection('products').get();
+    const snapshot = await adminDb.collection('products').orderBy('createdAt', 'desc').get();
     return snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),

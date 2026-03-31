@@ -52,6 +52,31 @@ export default function ChatPage() {
     fetchChats();
   }, []);
 
+  // Poll for new messages every 5 seconds when a chat is open
+  useEffect(() => {
+    if (!selectedChat) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/chats/${selectedChat.id}`);
+        if (res.ok) {
+          const msgs = await res.json();
+          setMessages(prev => {
+            if (msgs.length !== prev.length) {
+              setTimeout(() => {
+                if (messagesContainerRef.current) {
+                  messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+                }
+              }, 100);
+              return msgs;
+            }
+            return prev;
+          });
+        }
+      } catch {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [selectedChat]);
+
   const fetchChats = async () => {
     try {
       const res = await fetch('/api/chats');

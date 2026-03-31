@@ -318,9 +318,9 @@ function ServicesContent() {
                     onChange={e => handleFileSelect(e, service)}
                   />
                   <label htmlFor="service-file-upload">
-                    <Button size="sm" variant="outline" className="text-xs cursor-pointer" onClick={() => document.getElementById('service-file-upload')?.click()}>
+                    <span className="inline-flex items-center justify-center rounded-sm border-2 border-safety-orange text-safety-orange hover:bg-safety-orange/10 px-3 py-1.5 text-xs font-semibold cursor-pointer transition-colors">
                       Choose Files
-                    </Button>
+                    </span>
                   </label>
                   {fileError && (
                     <p className="mt-2 text-xs text-red-500 font-bold">{fileError}</p>

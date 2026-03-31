@@ -20,6 +20,26 @@ export default function DashboardPage() {
   const [userOrders, setUserOrders] = useState<any[]>([]);
   const [userConsultations, setUserConsultations] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [payBusyId, setPayBusyId] = useState<string | null>(null);
+
+  const resumeGcashPayment = async (orderId: string) => {
+    setPayBusyId(orderId);
+    try {
+      const res = await fetch('/api/payments/create-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.checkoutUrl) {
+        alert(data.error || 'Could not open payment');
+        return;
+      }
+      window.location.assign(data.checkoutUrl);
+    } finally {
+      setPayBusyId(null);
+    }
+  };
 
   useEffect(() => {
     if (status !== 'authenticated') return;
@@ -188,15 +208,6 @@ export default function DashboardPage() {
                                <p className="text-xl font-black text-esd-dark">PHP {(order.total || 0).toFixed(2)}</p>
                                <Badge variant={order.status === 'delivered' ? 'completed' : order.status === 'shipped' ? 'in-progress' : 'pending'}>{(order.status || 'processing').toUpperCase()}</Badge>
                              </div>
-                            {order.deliveryMethod && (
-                              <div className="flex items-center gap-1.5 mt-2">
-                                {order.deliveryMethod === 'pickup' ? (
-                                  <><MapPin className="w-3 h-3 text-blue-500" /><span className="text-[10px] text-blue-400 font-bold uppercase">Pickup: {order.pickupPointName || 'Local'}</span></>
-                                ) : (
-                                  <><Truck className="w-3 h-3 text-safety-orange" /><span className="text-[10px] text-zinc-500 font-bold uppercase">Standard Delivery</span></>
-                                )}
-                              </div>
-                            )}
                           </div>
                         </Card>
                       ))
@@ -235,13 +246,28 @@ export default function DashboardPage() {
                           <p className="text-xl font-black text-esd-dark">PHP {(order.total || 0).toFixed(2)}</p>
                           <Badge variant={order.status === 'delivered' ? 'completed' : order.status === 'shipped' ? 'in-progress' : 'pending'}>{(order.status || 'processing').toUpperCase()}</Badge>
                           {order.paymentMethod && (
-                            <div className="flex items-center gap-1 mt-1">
+                            <div className="flex items-center gap-1 mt-1 justify-end">
                               {order.paymentMethod === 'gcash' ? (
                                 <><CreditCard className="w-3 h-3 text-blue-400" /><span className="text-[10px] text-blue-400 font-bold uppercase">GCash</span></>
                               ) : (
                                 <><Banknote className="w-3 h-3 text-green-500" /><span className="text-[10px] text-green-400 font-bold uppercase">COD</span></>
                               )}
                             </div>
+                          )}
+                          {order.paymentStatus === 'awaiting_gateway' && order.paymentMethod === 'gcash' && (
+                            <p className="text-[10px] text-amber-400 font-bold mt-1">Awaiting GCash payment</p>
+                          )}
+                          {order.paymentStatus === 'awaiting_gateway' && order.paymentMethod === 'gcash' && order.id && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="mt-2"
+                              disabled={payBusyId === order.id}
+                              onClick={() => resumeGcashPayment(order.id)}
+                            >
+                              {payBusyId === order.id ? 'Opening…' : 'Complete GCash payment'}
+                            </Button>
                           )}
                         </div>
                       </Card>

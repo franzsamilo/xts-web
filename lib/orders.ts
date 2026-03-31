@@ -15,6 +15,8 @@ export interface StatusHistoryEntry {
   updatedBy: string;
 }
 
+export type OrderPaymentStatus = 'pending' | 'awaiting_gateway' | 'paid' | 'failed';
+
 export interface OrderData {
   id?: string;
   items: OrderItem[];
@@ -27,6 +29,12 @@ export interface OrderData {
   pickupPointId?: string;
   pickupPointName?: string;
   paymentMethod?: 'cod' | 'gcash';
+  /** COD: pending. GCash before PayMongo: awaiting_gateway. After webhook success: paid. */
+  paymentStatus?: OrderPaymentStatus;
+  paymongoLinkId?: string;
+  paymongoPaymentId?: string;
+  paidAt?: string;
+  paymentFailureReason?: string | null;
   createdAt: Date | any;
 }
 
@@ -77,8 +85,12 @@ export async function getOrdersByUser(email: string): Promise<OrderData[]> {
 }
 
 export async function createOrder(data: Omit<OrderData, 'id'>): Promise<OrderData> {
+  const paymentStatus: OrderPaymentStatus =
+    data.paymentMethod === 'gcash' ? 'awaiting_gateway' : 'pending';
+
   const docRef = await adminDb.collection('orders').add({
     ...data,
+    paymentStatus,
     status: 'pending',
     statusHistory: [{
       status: 'pending',
@@ -87,7 +99,75 @@ export async function createOrder(data: Omit<OrderData, 'id'>): Promise<OrderDat
     }],
     createdAt: new Date(),
   });
-  return { id: docRef.id, ...data };
+
+  return {
+    id: docRef.id,
+    ...data,
+    paymentStatus,
+    status: 'pending',
+  };
+}
+
+export async function getOrderById(id: string): Promise<OrderData | null> {
+  const doc = await adminDb.collection('orders').doc(id).get();
+  if (!doc.exists) return null;
+  return {
+    id: doc.id,
+    ...doc.data(),
+    createdAt: doc.data()?.createdAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
+  } as OrderData;
+}
+
+export async function updateOrderPaymongoLinkId(
+  orderId: string,
+  paymongoLinkId: string
+): Promise<void> {
+  await adminDb.collection('orders').doc(orderId).update({
+    paymongoLinkId,
+  });
+}
+
+/** Idempotent: safe for webhook retries. */
+export async function markOrderPaidFromPaymongo(
+  orderId: string,
+  paymongoPaymentId?: string
+): Promise<boolean> {
+  const ref = adminDb.collection('orders').doc(orderId);
+  const snap = await ref.get();
+  if (!snap.exists) return false;
+
+  const existing = snap.data() as OrderData | undefined;
+  if (existing?.paymentStatus === 'paid') return true;
+
+  const history = existing?.statusHistory || [];
+  history.push({
+    status: 'processing',
+    timestamp: new Date().toISOString(),
+    updatedBy: 'paymongo',
+  });
+
+  await ref.update({
+    paymentStatus: 'paid',
+    paymongoPaymentId: paymongoPaymentId ?? null,
+    paidAt: new Date().toISOString(),
+    status: 'processing',
+    statusHistory: history,
+  });
+  return true;
+}
+
+export async function markOrderPaymentFailed(orderId: string, reason?: string): Promise<void> {
+  const ref = adminDb.collection('orders').doc(orderId);
+  const snap = await ref.get();
+  if (!snap.exists) return;
+
+  const existing = snap.data() as OrderData | undefined;
+  if (existing?.paymentStatus === 'paid') return;
+
+  await ref.update({
+    paymentStatus: 'failed',
+    ...(reason ? { paymentFailureReason: reason } : {}),
+  });
 }
 
 export async function updateOrderStatus(id: string, status: string, updatedBy: string = 'admin'): Promise<void> {

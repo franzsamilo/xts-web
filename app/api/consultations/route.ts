@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAllConsultations, createConsultation } from '@/lib/consultations';
+import { getAllConsultations, getConsultationsByUser, createConsultation } from '@/lib/consultations';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
@@ -10,8 +10,14 @@ export async function GET() {
   }
 
   try {
-    const consultations = await getAllConsultations();
-    return NextResponse.json(consultations);
+    const role = (session.user as any)?.role || '';
+    if (role.includes('admin') || role.includes('expert')) {
+      const consultations = await getAllConsultations();
+      return NextResponse.json(consultations);
+    } else {
+      const consultations = await getConsultationsByUser(session.user?.email || '');
+      return NextResponse.json(consultations);
+    }
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch consultations' }, { status: 500 });
   }

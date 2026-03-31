@@ -68,6 +68,7 @@ export default function SellerDashboard() {
       };
       reader.readAsDataURL(file);
     });
+    e.target.value = '';
   };
 
   const removeImage = (index: number) => {

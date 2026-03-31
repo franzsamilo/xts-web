@@ -4,12 +4,12 @@ import { XTSLogo } from '@/components/icons';
 
 const footerLinks = [
   {
-    title: 'Company',
+    title: 'Platform',
     links: [
-      { name: 'About Us', href: '/about' },
-      { name: 'Careers', href: '/careers' },
-      { name: 'Blog', href: '/blog' },
-      { name: 'Contact', href: '/contact' },
+      { name: 'Shop', href: '/shop' },
+      { name: 'Community', href: '/community' },
+      { name: 'Consultation', href: '/consultation' },
+      { name: 'Dashboard', href: '/dashboard' },
     ],
   },
   {
@@ -25,9 +25,9 @@ const footerLinks = [
     title: 'Support',
     links: [
       { name: 'Order Status', href: '/dashboard' },
-      { name: 'Shipping Policy', href: '/shipping' },
-      { name: 'Returns', href: '/returns' },
-      { name: 'FAQ', href: '/faq' },
+      { name: 'Messages', href: '/chat' },
+      { name: 'Privacy Policy', href: '/privacy' },
+      { name: 'Terms of Service', href: '/terms' },
     ],
   },
 ];

@@ -35,7 +35,7 @@ export const Button = ({
 
   return (
     <motion.button
-      whileTap={{ y: 2, boxShadow: 'none' }}
+      whileTap={{ y: 2 }}
       whileHover={{ y: -1 }}
       className={cn(
         'btn-press inline-flex items-center justify-center rounded-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed',

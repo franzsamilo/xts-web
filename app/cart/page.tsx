@@ -11,6 +11,7 @@ import { useCart } from '@/lib/cart-context';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Minus, Plus, X, ShoppingCart, Package, ArrowRight, Trash2, CheckCircle2, Activity, Truck, MapPin, CreditCard, Banknote, MessageCircle } from 'lucide-react';
+import { BASE_CURRENCY, PAYMONGO_MIN_AMOUNT_PHP } from '@/lib/currency';
 
 interface PickupPoint {
   id: string;
@@ -18,15 +19,21 @@ interface PickupPoint {
   address: string;
 }
 
+/** Courier delivery (e.g. J&T): UI kept for later; disabled until integration. */
+const STANDARD_DELIVERY_ENABLED = false;
+
 export default function CartPage() {
   const { items, removeFromCart, updateQuantity, clearCart, cartCount, cartTotal } = useCart();
   const { data: session } = useSession();
   const router = useRouter();
   const [checkingOut, setCheckingOut] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [orderPlaced, setOrderPlaced] = useState<string | null>(null);
 
-  // Delivery state
-  const [deliveryMethod, setDeliveryMethod] = useState<'standard' | 'pickup' | null>(null);
+  // Delivery state — default to pickup while standard delivery is disabled
+  const [deliveryMethod, setDeliveryMethod] = useState<'standard' | 'pickup' | null>(
+    STANDARD_DELIVERY_ENABLED ? null : 'pickup'
+  );
   const [pickupPoints, setPickupPoints] = useState<PickupPoint[]>([]);
   const [selectedPickup, setSelectedPickup] = useState<PickupPoint | null>(null);
   const [loadingPickupPoints, setLoadingPickupPoints] = useState(false);
@@ -46,7 +53,17 @@ export default function CartPage() {
     }
   }, [deliveryMethod, pickupPoints.length]);
 
-  const canCheckout = session && deliveryMethod && paymentMethod && (deliveryMethod === 'standard' || (deliveryMethod === 'pickup' && selectedPickup));
+  const belowMinForGcash =
+    paymentMethod === 'gcash' &&
+    BASE_CURRENCY.toUpperCase() === 'PHP' &&
+    cartTotal < PAYMONGO_MIN_AMOUNT_PHP;
+
+  const canCheckout =
+    session &&
+    deliveryMethod &&
+    paymentMethod &&
+    !belowMinForGcash &&
+    (deliveryMethod === 'standard' || (deliveryMethod === 'pickup' && selectedPickup));
 
   const handlePickupChat = async () => {
     if (!session || !selectedPickup) return;
@@ -82,9 +99,11 @@ export default function CartPage() {
     }
 
     if (!deliveryMethod || !paymentMethod) return;
+    if (!STANDARD_DELIVERY_ENABLED && deliveryMethod === 'standard') return;
     if (deliveryMethod === 'pickup' && !selectedPickup) return;
 
     setCheckingOut(true);
+    setCheckoutError(null);
     try {
       const res = await fetch('/api/orders', {
         method: 'POST',
@@ -106,13 +125,38 @@ export default function CartPage() {
         }),
       });
 
-      if (res.ok) {
-        const order = await res.json();
-        setOrderPlaced(order.id);
-        clearCart();
+      const orderPayload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCheckoutError(orderPayload.error || 'Could not create order');
+        return;
       }
+
+      const order = orderPayload as { id: string };
+
+      if (paymentMethod === 'gcash') {
+        const linkRes = await fetch('/api/payments/create-link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: order.id }),
+        });
+        const linkData = await linkRes.json().catch(() => ({}));
+        if (!linkRes.ok || !linkData.checkoutUrl) {
+          setCheckoutError(
+            linkData.error ||
+              'Could not start GCash payment. Your order was saved — open Dashboard → Order History and use “Complete GCash payment”, or contact support.'
+          );
+          return;
+        }
+        clearCart();
+        window.location.assign(linkData.checkoutUrl as string);
+        return;
+      }
+
+      setOrderPlaced(order.id);
+      clearCart();
     } catch (e) {
       console.error('Checkout failed', e);
+      setCheckoutError('Checkout failed. Please try again.');
     } finally {
       setCheckingOut(false);
     }
@@ -213,7 +257,7 @@ export default function CartPage() {
                           </Link>
                           <span className="text-sm font-black text-safety-orange">PHP {item.price.toFixed(2)}</span>
                         </div>
-                        <div className="flex items-center gap-6">
+                        <div className="flex flex-wrap items-center gap-3 sm:gap-6">
                           <div className="flex items-center gap-0 border border-black/10 rounded-sm overflow-hidden">
                             <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-10 h-10 flex items-center justify-center bg-zinc-100 hover:bg-zinc-200 text-esd-dark transition-colors">
                               <Minus className="w-3 h-3" />
@@ -223,8 +267,8 @@ export default function CartPage() {
                               <Plus className="w-3 h-3" />
                             </button>
                           </div>
-                          <span className="text-lg font-black text-esd-dark w-28 text-right">PHP {(item.price * item.quantity).toFixed(2)}</span>
-                          <button onClick={() => removeFromCart(item.id)} className="text-zinc-400 hover:text-red-500 transition-colors p-2">
+                          <span className="text-base sm:text-lg font-black text-esd-dark sm:w-28 text-right">PHP {(item.price * item.quantity).toFixed(2)}</span>
+                          <button onClick={() => removeFromCart(item.id)} className="text-zinc-400 hover:text-red-500 transition-colors p-2 ml-auto sm:ml-0">
                             <X className="w-4 h-4" />
                           </button>
                         </div>
@@ -237,41 +281,79 @@ export default function CartPage() {
 
             {/* ─── Delivery Method Selector ─── */}
             <div className="mt-10">
-              <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-6 flex items-center gap-3">
+              <h3
+                className={`text-lg font-black text-white uppercase tracking-tighter flex items-center gap-3 ${
+                  STANDARD_DELIVERY_ENABLED ? 'mb-6' : 'mb-2'
+                }`}
+              >
                 <Truck className="w-5 h-5 text-safety-orange" />
                 Select Delivery Method
               </h3>
+              {!STANDARD_DELIVERY_ENABLED && (
+                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-6">
+                  Courier delivery paused — pickup only for now
+                </p>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Standard Delivery */}
+                {/* Standard Delivery — disabled for now; re-enable via STANDARD_DELIVERY_ENABLED */}
                 <button
+                  type="button"
                   id="delivery-standard"
-                  onClick={() => { setDeliveryMethod('standard'); setSelectedPickup(null); }}
+                  disabled={!STANDARD_DELIVERY_ENABLED}
+                  onClick={() => {
+                    if (!STANDARD_DELIVERY_ENABLED) return;
+                    setDeliveryMethod('standard');
+                    setSelectedPickup(null);
+                  }}
                   className={`relative text-left p-6 rounded-sm border-2 transition-all duration-200 group ${
-                    deliveryMethod === 'standard'
-                      ? 'border-safety-orange bg-safety-orange/5 shadow-lg shadow-safety-orange/10'
-                      : 'border-white/10 bg-zinc-900 hover:border-white/20'
+                    STANDARD_DELIVERY_ENABLED
+                      ? deliveryMethod === 'standard'
+                        ? 'border-safety-orange bg-safety-orange/5 shadow-lg shadow-safety-orange/10'
+                        : 'border-white/10 bg-zinc-900 hover:border-white/20'
+                      : 'border-white/10 bg-zinc-950/80 opacity-70 cursor-not-allowed border-dashed'
                   }`}
                 >
                   <div className="flex items-start gap-4">
-                    <div className={`w-12 h-12 rounded-sm flex items-center justify-center shrink-0 transition-colors ${
-                      deliveryMethod === 'standard' ? 'bg-safety-orange text-white' : 'bg-zinc-800 text-zinc-500 group-hover:text-white'
-                    }`}>
+                    <div
+                      className={`w-12 h-12 rounded-sm flex items-center justify-center shrink-0 transition-colors ${
+                        STANDARD_DELIVERY_ENABLED && deliveryMethod === 'standard'
+                          ? 'bg-safety-orange text-white'
+                          : 'bg-zinc-800 text-zinc-600'
+                      }`}
+                    >
                       <Truck className="w-6 h-6" />
                     </div>
-                    <div>
-                      <h4 className="text-sm font-black text-white uppercase tracking-tight mb-1">Standard Delivery</h4>
-                      <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest leading-relaxed">
+                    <div className="min-w-0">
+                      <h4
+                        className={`text-sm font-black text-white uppercase tracking-tight mb-1 ${
+                          !STANDARD_DELIVERY_ENABLED ? 'line-through decoration-zinc-500 decoration-2' : ''
+                        }`}
+                      >
+                        Standard Delivery
+                      </h4>
+                      <p
+                        className={`text-[10px] font-bold uppercase tracking-widest leading-relaxed ${
+                          !STANDARD_DELIVERY_ENABLED
+                            ? 'text-zinc-600 line-through decoration-zinc-600'
+                            : 'text-zinc-500'
+                        }`}
+                      >
                         Delivered via courier partner (J&T Express)
                       </p>
-                      <div className="mt-3 flex items-center gap-2">
-                        <span className="text-[9px] font-black text-yellow-500 uppercase tracking-widest bg-yellow-500/10 px-2 py-1 rounded-sm border border-yellow-500/20">
-                          Integration Pending
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest bg-zinc-800/80 px-2 py-1 rounded-sm border border-white/10">
+                          Pickup only for now
                         </span>
+                        {STANDARD_DELIVERY_ENABLED && (
+                          <span className="text-[9px] font-black text-yellow-500 uppercase tracking-widest bg-yellow-500/10 px-2 py-1 rounded-sm border border-yellow-500/20">
+                            Integration Pending
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
-                  {deliveryMethod === 'standard' && (
+                  {STANDARD_DELIVERY_ENABLED && deliveryMethod === 'standard' && (
                     <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute top-3 right-3">
                       <CheckCircle2 className="w-5 h-5 text-safety-orange" />
                     </motion.div>
@@ -459,8 +541,8 @@ export default function CartPage() {
                         Pay via Paymongo GCash
                       </p>
                       <div className="mt-3 flex items-center gap-2">
-                        <span className="text-[9px] font-black text-yellow-500 uppercase tracking-widest bg-yellow-500/10 px-2 py-1 rounded-sm border border-yellow-500/20">
-                          Integration Pending
+                        <span className="text-[9px] font-black text-blue-400/90 uppercase tracking-widest bg-blue-500/10 px-2 py-1 rounded-sm border border-blue-500/25">
+                          Available
                         </span>
                       </div>
                     </div>
@@ -488,7 +570,7 @@ export default function CartPage() {
                   <div className="flex justify-between text-sm">
                     <span className="text-zinc-500 font-bold uppercase">Shipping</span>
                     <span className="text-zinc-400 font-medium italic">
-                      {deliveryMethod === 'standard' ? 'TBD' : deliveryMethod === 'pickup' ? 'Free (Pickup)' : '—'}
+                      {deliveryMethod === 'pickup' ? 'Free (Pickup)' : STANDARD_DELIVERY_ENABLED && deliveryMethod === 'standard' ? 'TBD' : '—'}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
@@ -501,7 +583,7 @@ export default function CartPage() {
                 {deliveryMethod && (
                   <div className="mb-4 p-3 rounded-sm border border-white/5 bg-zinc-800/50">
                     <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Delivery</span>
-                    {deliveryMethod === 'standard' ? (
+                    {STANDARD_DELIVERY_ENABLED && deliveryMethod === 'standard' ? (
                       <div className="flex items-center gap-2">
                         <Truck className="w-3.5 h-3.5 text-safety-orange" />
                         <span className="text-xs font-bold text-white">Standard Delivery (J&T)</span>
@@ -559,6 +641,20 @@ export default function CartPage() {
                 {session && deliveryMethod && !paymentMethod && (
                   <div className="mb-4 p-3 bg-yellow-950/30 border border-yellow-500/20 rounded-sm">
                     <p className="text-xs text-yellow-400 font-bold">Please select a payment method below.</p>
+                  </div>
+                )}
+
+                {session && paymentMethod === 'gcash' && belowMinForGcash && (
+                  <div className="mb-4 p-3 bg-red-950/30 border border-red-500/20 rounded-sm">
+                    <p className="text-xs text-red-400 font-bold">
+                      Minimum GCash (PayMongo) payment is PHP {PAYMONGO_MIN_AMOUNT_PHP.toFixed(2)}. Add items or choose COD.
+                    </p>
+                  </div>
+                )}
+
+                {checkoutError && (
+                  <div className="mb-4 p-3 bg-red-950/30 border border-red-500/20 rounded-sm">
+                    <p className="text-xs text-red-400 font-bold">{checkoutError}</p>
                   </div>
                 )}
 

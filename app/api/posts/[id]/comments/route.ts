@@ -49,12 +49,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         createdAt: new Date(),
       });
 
-    // Increment the post's comment count
+    // Atomically increment the post's comment count
+    const { FieldValue } = await import('firebase-admin/firestore');
     const postRef = adminDb.collection('posts').doc(id);
-    const postDoc = await postRef.get();
-    if (postDoc.exists) {
-      await postRef.update({ comments: (postDoc.data()?.comments || 0) + 1 });
-    }
+    await postRef.update({ comments: FieldValue.increment(1) });
 
     return NextResponse.json({
       id: commentRef.id,

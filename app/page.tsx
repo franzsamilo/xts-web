@@ -317,7 +317,13 @@ export default function Home() {
               placeholder="engineer@example.com"
               className="grow bg-zinc-800 border-2 border-zinc-700 px-4 py-3 text-white focus:outline-none focus:border-safety-orange transition-colors"
             />
-            <Button>Join</Button>
+            <Button onClick={(e) => {
+              const input = (e.target as HTMLElement).parentElement?.querySelector('input');
+              if (input && input.value.includes('@')) {
+                input.value = '';
+                alert('Thanks for subscribing!');
+              }
+            }}>Join</Button>
           </div>
           <p className="mt-4 text-zinc-600 text-sm font-handwriting">No spam, just schematics and new part drops.</p>
         </div>

@@ -35,6 +35,8 @@ export async function POST(req: Request) {
       comments: 0,
       isPinned: false,
       imageUrls: body.imageUrls || [],
+      userId,
+      userEmail: session.user?.email || '',
       createdAt: new Date(),
     });
 

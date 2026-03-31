@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, Info } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -26,6 +26,24 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
+  const cancelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [open, onCancel]);
+
+  // Auto-focus the modal when opened
+  useEffect(() => {
+    if (open && cancelRef.current) {
+      cancelRef.current.focus();
+    }
+  }, [open]);
+
   if (!open) return null;
 
   const isDanger = variant === 'danger';
@@ -39,6 +57,9 @@ export function ConfirmModal({
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
           onClick={onCancel}
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
         >
           {/* Backdrop */}
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
@@ -51,6 +72,8 @@ export function ConfirmModal({
             transition={{ duration: 0.15 }}
             onClick={(e) => e.stopPropagation()}
             className="relative bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-sm shadow-2xl w-full max-w-sm overflow-hidden"
+            ref={cancelRef}
+            tabIndex={-1}
           >
             {/* Top accent bar */}
             <div className={`h-1 w-full ${isDanger ? 'bg-red-500' : 'bg-safety-orange'}`} />

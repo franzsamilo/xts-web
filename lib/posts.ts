@@ -12,6 +12,8 @@ export interface PostData {
   comments: number;
   isPinned: boolean;
   imageUrls?: string[];
+  userId?: string;
+  userEmail?: string;
   createdAt: Date | any;
 }
 
@@ -47,28 +49,23 @@ export async function createPost(data: Omit<PostData, 'id'>): Promise<PostData> 
 }
 
 export async function likePost(postId: string, userId: string): Promise<{ likes: number; alreadyLiked: boolean }> {
-  try {
-    const docRef = adminDb.collection('posts').doc(postId);
-    const doc = await docRef.get();
+  const { FieldValue } = await import('firebase-admin/firestore');
+  const docRef = adminDb.collection('posts').doc(postId);
+  const doc = await docRef.get();
 
-    if (!doc.exists) throw new Error('Post not found');
+  if (!doc.exists) throw new Error('Post not found');
 
-    const data = doc.data()!;
-    const likedBy: string[] = data.likedBy || [];
+  const data = doc.data()!;
+  const likedBy: string[] = data.likedBy || [];
 
-    if (likedBy.includes(userId)) {
-      return { likes: data.likes, alreadyLiked: true };
-    }
-
-    const newLikes = (data.likes || 0) + 1;
-    await docRef.update({
-      likes: newLikes,
-      likedBy: [...likedBy, userId],
-    });
-
-    return { likes: newLikes, alreadyLiked: false };
-  } catch (error) {
-    console.error('Error liking post:', error);
-    throw error;
+  if (likedBy.includes(userId)) {
+    return { likes: data.likes, alreadyLiked: true };
   }
+
+  await docRef.update({
+    likes: FieldValue.increment(1),
+    likedBy: FieldValue.arrayUnion(userId),
+  });
+
+  return { likes: (data.likes || 0) + 1, alreadyLiked: false };
 }

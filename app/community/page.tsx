@@ -432,12 +432,12 @@ export default function CommunityPage() {
                                             <div className="w-8 h-8 bg-zinc-800 rounded-full flex items-center justify-center text-[10px] text-white font-black shrink-0 border border-white/10">
                                               {c.avatar}
                                             </div>
-                                            <div className="flex-grow bg-zinc-50 rounded-sm p-3 border border-black/5">
+                                            <div className="flex-grow bg-[var(--bg-surface)] rounded-sm p-3 border border-[var(--border-secondary)]">
                                               <div className="flex items-center gap-2 mb-1">
                                                 <span className="text-xs font-black text-esd-dark uppercase">@{c.author}</span>
                                                 <span className="text-[10px] text-zinc-400">{timeAgo(c.createdAt)}</span>
                                               </div>
-                                              <p className="text-sm text-zinc-700">{c.content}</p>
+                                              <p className="text-sm text-[var(--text-secondary)]">{c.content}</p>
                                             </div>
                                           </div>
                                         ))
