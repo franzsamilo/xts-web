@@ -8,6 +8,10 @@ const MAX_TITLE = 120;
 const MAX_PRICE_HINT = 60;
 const MAX_SLOT = 120;
 const MAX_NAME = 120;
+const MAX_TYPE = 64;
+const MAX_DESCRIPTION = 4000;
+const MAX_SKILLS = 500;
+const VALID_CONSULTATION_TYPES = ['cad-review', 'firmware-debug', 'hardware-design', 'general'];
 
 function clampString(value: unknown, maxLen: number): string {
   if (typeof value !== 'string') return '';
@@ -49,6 +53,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'expertTitle is required' }, { status: 400 });
     }
 
+    const consultationTypeRaw = clampString(body?.consultationType, MAX_TYPE);
+    const consultationType = VALID_CONSULTATION_TYPES.includes(consultationTypeRaw)
+      ? consultationTypeRaw
+      : undefined;
+    const projectDescription = clampString(body?.projectDescription, MAX_DESCRIPTION);
+    const requiredSkills = clampString(body?.requiredSkills, MAX_SKILLS);
+
     const consultation = await createConsultation({
       // expertName is admin-managed once a real expert is assigned; the request
       // form only knows it's "Pending Assignment" until then.
@@ -61,6 +72,9 @@ export async function POST(req: Request) {
       clientEmail: session.user.email,
       slot: clampString(body?.slot, MAX_SLOT) || 'Flexible',
       status: 'pending',
+      consultationType,
+      projectDescription: projectDescription || undefined,
+      requiredSkills: requiredSkills || undefined,
       createdAt: new Date(),
     });
     return NextResponse.json(consultation);

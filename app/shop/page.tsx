@@ -5,17 +5,18 @@ import Link from 'next/link';
 import { PageShell } from '@/components/layout/PageShell';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
-import { ShopIcon } from '@/components/icons';
-import { Box, Search, Filter, Star, ShoppingCart, Activity, Check } from 'lucide-react';
+import { ProductCardSkeleton } from '@/components/ui/Skeleton';
+import { Box, Search, Star, ShoppingCart, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '@/lib/cart-context';
+import type { ProductDTO } from '@/lib/types';
 
 export default function ShopPage() {
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<ProductDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
@@ -25,9 +26,12 @@ export default function ShopPage() {
     const fetchProducts = async () => {
       try {
         const res = await fetch('/api/products');
-        if (res.ok) setProducts(await res.json());
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as ProductDTO[];
+        setProducts(data);
       } catch (e) {
         console.error("Failed to fetch products", e);
+        setFetchError("Couldn't load products. Please refresh to try again.");
       } finally {
         setLoading(false);
       }
@@ -45,11 +49,11 @@ export default function ShopPage() {
     return matchCategory && matchSearch;
   });
 
-  const handleAddToCart = (product: any) => {
+  const handleAddToCart = (product: ProductDTO) => {
     addToCart({
       id: product.id,
       name: product.name,
-      price: parseFloat(product.price),
+      price: Number(product.price),
       category: product.category,
       sku: product.sku,
       tag: product.tag,
@@ -94,8 +98,18 @@ export default function ShopPage() {
           </div>
         </div>
 
+        {fetchError && (
+          <div className="mb-8 p-4 bg-red-950/30 border border-red-500/20 rounded-sm">
+            <p className="text-sm text-red-400 font-bold">{fetchError}</p>
+          </div>
+        )}
+
         {loading ? (
-          <div className="py-20 flex justify-center"><Activity className="w-8 h-8 text-safety-orange animate-spin" /></div>
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-6">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <ProductCardSkeleton key={i} />
+            ))}
+          </div>
         ) : filtered.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-6">
             <AnimatePresence mode="popLayout">
@@ -142,7 +156,7 @@ export default function ShopPage() {
                           </div>
 
                           <div className="flex items-end justify-between mt-auto">
-                            <span className="text-base sm:text-lg font-black text-[var(--text-on-card)]">₱{parseFloat(product.price).toLocaleString()}</span>
+                            <span className="text-base sm:text-lg font-black text-[var(--text-on-card)]">₱{Number(product.price).toLocaleString()}</span>
                           </div>
                         </div>
                       </Card>

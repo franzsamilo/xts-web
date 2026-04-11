@@ -9,6 +9,12 @@ export interface ConsultationData {
   clientEmail: string;
   slot: string;
   status: string;
+  /** Identifier for the curated consultation type the customer picked. */
+  consultationType?: string;
+  /** Free-text problem statement from the request form. */
+  projectDescription?: string;
+  /** Tools/skills the customer thinks the engagement needs. */
+  requiredSkills?: string;
   createdAt: Date | any;
 }
 
