@@ -7,7 +7,10 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
-      return NextResponse.json({ accepted: true }); // Don't block unauthenticated users
+      // Unauthenticated users have nothing to accept yet — return false so the
+      // UI shows the terms gate after they sign in. (Was previously fail-open
+      // returning accepted:true, which let unauthenticated callers bypass.)
+      return NextResponse.json({ accepted: false });
     }
 
     const userDoc = await adminDb.collection('users').doc(session.user.email).get();
@@ -17,7 +20,8 @@ export async function GET() {
       accepted: !!userData?.acceptedTermsAt,
     });
   } catch (error) {
-    return NextResponse.json({ accepted: true }); // Fail open
+    console.error('users/terms GET error:', error);
+    return NextResponse.json({ error: 'Failed to read terms status' }, { status: 500 });
   }
 }
 

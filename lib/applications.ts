@@ -1,25 +1,39 @@
 import { adminDb } from '@/lib/firebase/admin';
 
-export async function createApplication(data: any) {
-  try {
-    const docRef = await adminDb.collection('applications').add({
-      ...data,
-      status: 'pending',
-      createdAt: new Date(),
-    });
-    return { id: docRef.id, ...data };
-  } catch (error) {
-    console.error('Error creating application:', error);
-    throw error;
-  }
+export type ApplicationType = 'expert' | 'seller';
+export type ApplicationStatus = 'pending' | 'approved' | 'rejected';
+
+export interface ApplicationData {
+  id?: string;
+  type: ApplicationType;
+  name: string;
+  expertise: string;
+  description?: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  status: ApplicationStatus;
+  createdAt: Date | any;
+  updatedAt?: Date | any;
 }
 
-export async function getAllApplications() {
+export async function createApplication(
+  data: Omit<ApplicationData, 'id' | 'status' | 'createdAt'>
+): Promise<ApplicationData> {
+  const docRef = await adminDb.collection('applications').add({
+    ...data,
+    status: 'pending',
+    createdAt: new Date(),
+  });
+  return { id: docRef.id, ...data, status: 'pending', createdAt: new Date() };
+}
+
+export async function getAllApplications(): Promise<ApplicationData[]> {
   try {
     const snapshot = await adminDb.collection('applications').orderBy('createdAt', 'desc').get();
     return snapshot.docs.map(doc => ({
       id: doc.id,
-      ...doc.data()
+      ...(doc.data() as Omit<ApplicationData, 'id'>),
     }));
   } catch (error) {
     console.error('Error fetching applications:', error);
