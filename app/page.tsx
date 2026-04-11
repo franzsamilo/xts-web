@@ -308,26 +308,45 @@ export default function Home() {
       </section>
 
       {/* Newsletter */}
-      <section className="py-24 border-t border-white/5">
-        <div className="container mx-auto px-6 flex flex-col items-center">
-          <h3 className="text-3xl font-black uppercase tracking-tighter text-white mb-8 text-center">Get Engineering Updates</h3>
-          <div className="flex w-full max-w-md gap-2">
-            <input 
-              type="email" 
-              placeholder="engineer@example.com"
-              className="grow bg-zinc-800 border-2 border-zinc-700 px-4 py-3 text-white focus:outline-none focus:border-safety-orange transition-colors"
-            />
-            <Button onClick={(e) => {
-              const input = (e.target as HTMLElement).parentElement?.querySelector('input');
-              if (input && input.value.includes('@')) {
-                input.value = '';
-                alert('Thanks for subscribing!');
-              }
-            }}>Join</Button>
-          </div>
-          <p className="mt-4 text-zinc-600 text-sm font-handwriting">No spam, just schematics and new part drops.</p>
-        </div>
-      </section>
-    </PageShell>
+      <NewsletterSignup />
+      </PageShell>
   );
 }
+
+function NewsletterSignup() {
+  const [email, setEmail] = React.useState('');
+  const [subscribed, setSubscribed] = React.useState(false);
+
+  const submit = () => {
+    if (!email.includes('@')) return;
+    setEmail('');
+    setSubscribed(true);
+    setTimeout(() => setSubscribed(false), 3000);
+  };
+
+  return (
+    <section className="py-24 border-t border-white/5">
+      <div className="container mx-auto px-6 flex flex-col items-center">
+        <h3 className="text-3xl font-black uppercase tracking-tighter text-white mb-8 text-center">Get Engineering Updates</h3>
+        <div className="flex w-full max-w-md gap-2">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && submit()}
+            placeholder="engineer@example.com"
+            aria-label="Email address"
+            className="grow bg-zinc-800 border-2 border-zinc-700 px-4 py-3 text-white focus:outline-none focus:border-safety-orange transition-colors"
+          />
+          <Button onClick={submit} disabled={!email.includes('@')}>Join</Button>
+        </div>
+        {subscribed ? (
+          <p className="mt-4 text-green-400 text-sm font-bold uppercase tracking-widest">Thanks for subscribing!</p>
+        ) : (
+          <p className="mt-4 text-zinc-600 text-sm font-handwriting">No spam, just schematics and new part drops.</p>
+        )}
+      </div>
+    </section>
+  );
+}
+

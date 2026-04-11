@@ -21,9 +21,11 @@ export default function DashboardPage() {
   const [userConsultations, setUserConsultations] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [payBusyId, setPayBusyId] = useState<string | null>(null);
+  const [payError, setPayError] = useState<string | null>(null);
 
   const resumeGcashPayment = async (orderId: string) => {
     setPayBusyId(orderId);
+    setPayError(null);
     try {
       const res = await fetch('/api/payments/create-link', {
         method: 'POST',
@@ -32,7 +34,7 @@ export default function DashboardPage() {
       });
       const data = await res.json();
       if (!res.ok || !data.checkoutUrl) {
-        alert(data.error || 'Could not open payment');
+        setPayError(data.error || 'Could not open payment');
         return;
       }
       window.location.assign(data.checkoutUrl);
@@ -258,16 +260,21 @@ export default function DashboardPage() {
                             <p className="text-[10px] text-amber-400 font-bold mt-1">Awaiting GCash payment</p>
                           )}
                           {order.paymentStatus === 'awaiting_gateway' && order.paymentMethod === 'gcash' && order.id && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="mt-2"
-                              disabled={payBusyId === order.id}
-                              onClick={() => resumeGcashPayment(order.id)}
-                            >
-                              {payBusyId === order.id ? 'Opening…' : 'Complete GCash payment'}
-                            </Button>
+                            <>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="mt-2"
+                                disabled={payBusyId === order.id}
+                                onClick={() => resumeGcashPayment(order.id)}
+                              >
+                                {payBusyId === order.id ? 'Opening…' : 'Complete GCash payment'}
+                              </Button>
+                              {payError && payBusyId === null && (
+                                <p className="text-[10px] text-red-400 font-bold mt-2 max-w-[18rem]">{payError}</p>
+                              )}
+                            </>
                           )}
                         </div>
                       </Card>

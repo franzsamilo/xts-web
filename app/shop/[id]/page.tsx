@@ -11,6 +11,7 @@ import { Box, ArrowLeft, ShieldCheck, Truck, RotateCcw, Activity, Check, Shoppin
 import Link from 'next/link';
 import { useCart } from '@/lib/cart-context';
 import { useSession } from 'next-auth/react';
+import { ADMIN_INBOX_EMAIL } from '@/lib/admin-email';
 
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [id, setId] = useState<string | null>(null);
@@ -78,8 +79,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          recipientId: 'admin@xts.com',
-          recipientName: 'XTS Store',
+          recipientId: ADMIN_INBOX_EMAIL,
           type: 'product',
           productRef: {
             id: product.id,

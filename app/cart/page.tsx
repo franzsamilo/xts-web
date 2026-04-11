@@ -8,6 +8,7 @@ import { SectionHeading } from '@/components/ui/SectionHeading';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useCart, PENDING_GCASH_ORDER_KEY } from '@/lib/cart-context';
+import { ADMIN_INBOX_EMAIL } from '@/lib/admin-email';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Minus, Plus, X, ShoppingCart, Package, ArrowRight, Trash2, CheckCircle2, Activity, Truck, MapPin, CreditCard, Banknote, MessageCircle } from 'lucide-react';
@@ -72,8 +73,7 @@ export default function CartPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          recipientId: 'admin@xts.com',
-          recipientName: 'XTS Admin',
+          recipientId: ADMIN_INBOX_EMAIL,
           type: 'pickup',
           initialMessage: `Hi! I'd like to arrange pickup at ${selectedPickup.name} (${selectedPickup.address}). I have ${cartCount} item(s) totaling ₱${cartTotal.toLocaleString()}.`,
           pickupRef: {

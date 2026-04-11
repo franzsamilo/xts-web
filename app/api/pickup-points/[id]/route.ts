@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
-import { updatePickupPoint } from '@/lib/pickup-points';
+import { updatePickupPoint, PickupPoint } from '@/lib/pickup-points';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { isAdmin } from '@/lib/roles';
+
+const MAX_NAME = 200;
+const MAX_ADDRESS = 400;
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
@@ -9,17 +13,27 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const role = (session.user as any)?.role || '';
-  if (!role.includes('admin')) {
+  if (!isAdmin((session.user as any)?.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   try {
     const { id } = await params;
-    const body = await req.json();
-    await updatePickupPoint(id, body);
+    const body = await req.json().catch(() => ({}));
+
+    const update: Partial<PickupPoint> = {};
+    if (typeof body?.name === 'string') update.name = body.name.trim().slice(0, MAX_NAME);
+    if (typeof body?.address === 'string') update.address = body.address.trim().slice(0, MAX_ADDRESS);
+    if (typeof body?.isActive === 'boolean') update.isActive = body.isActive;
+
+    if (Object.keys(update).length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+    }
+
+    await updatePickupPoint(id, update);
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error('pickup-points PATCH error:', error);
     return NextResponse.json({ error: 'Failed to update pickup point' }, { status: 500 });
   }
 }
@@ -30,8 +44,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const role = (session.user as any)?.role || '';
-  if (!role.includes('admin')) {
+  if (!isAdmin((session.user as any)?.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
