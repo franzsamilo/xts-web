@@ -7,7 +7,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { useCart } from '@/lib/cart-context';
+import { useCart, PENDING_GCASH_ORDER_KEY } from '@/lib/cart-context';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Minus, Plus, X, ShoppingCart, Package, ArrowRight, Trash2, CheckCircle2, Activity, Truck, MapPin, CreditCard, Banknote, MessageCircle } from 'lucide-react';
@@ -147,7 +147,10 @@ export default function CartPage() {
           );
           return;
         }
-        clearCart();
+        // Mark this order as the in-flight GCash payment. Cart stays intact in
+        // case the redirect fails — it will be cleared by CartProvider once the
+        // webhook confirms the order as paid (or failed).
+        try { localStorage.setItem(PENDING_GCASH_ORDER_KEY, order.id); } catch {}
         window.location.assign(linkData.checkoutUrl as string);
         return;
       }

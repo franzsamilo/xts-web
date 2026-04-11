@@ -75,10 +75,14 @@ export async function POST(req: NextRequest) {
           expectedMinor,
           amountMinor,
         });
-        return NextResponse.json(
-          { ok: false, reason: 'amount_mismatch' },
-          { status: 400 }
+        // Lock the order so PayMongo retries don't keep re-processing the same
+        // tampered event. markOrderPaymentFailed is idempotent and restores stock.
+        await markOrderPaymentFailed(
+          orderId,
+          `AMOUNT_MISMATCH expected=${expectedMinor} received=${amountMinor}`
         );
+        // Return 200 so PayMongo stops retrying — we've recorded the incident.
+        return NextResponse.json({ ok: true, locked: true, reason: 'amount_mismatch' });
       }
     }
 

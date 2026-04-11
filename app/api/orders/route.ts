@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getAllOrders, createOrder } from '@/lib/orders';
-import { getProductById } from '@/lib/products';
+import {
+  getAllOrders,
+  createOrderWithStockDeduction,
+  InsufficientStockError,
+  ProductMissingError,
+} from '@/lib/orders';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { logAction } from '@/lib/audit';
@@ -34,61 +38,44 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const paymentMethod = body.paymentMethod || 'cod';
+    const paymentMethod: 'cod' | 'gcash' = body.paymentMethod === 'gcash' ? 'gcash' : 'cod';
 
-    // Validate each item's price and stock from the database
-    const validatedItems = [];
-    let serverTotal = 0;
-
-    for (const item of body.items) {
-      const product = await getProductById(item.productId);
-      if (!product) {
-        return NextResponse.json(
-          { error: `Product "${item.name}" no longer exists` },
-          { status: 400 }
-        );
-      }
-      if (product.stock < item.quantity) {
-        return NextResponse.json(
-          { error: `Insufficient stock for "${product.name}" (available: ${product.stock})` },
-          { status: 400 }
-        );
-      }
-
-      validatedItems.push({
-        productId: item.productId,
-        name: product.name,
-        sku: product.sku || '',
-        category: product.category || 'Hardware',
-        price: product.price,
-        quantity: item.quantity,
-      });
-      serverTotal += product.price * item.quantity;
+    if (!Array.isArray(body.items) || body.items.length === 0) {
+      return NextResponse.json({ error: 'Cart is empty' }, { status: 400 });
     }
 
-    const order = await createOrder({
-      items: validatedItems,
-      total: serverTotal,
-      status: 'pending',
+    const itemsRequested = body.items.map((it: any) => ({
+      productId: String(it.productId),
+      quantity: Math.max(1, Number(it.quantity) || 0),
+    }));
+
+    const order = await createOrderWithStockDeduction({
+      itemsRequested,
       customerName: session.user?.name || 'Unknown',
       customerEmail: session.user?.email || '',
-      deliveryMethod: body.deliveryMethod || 'pickup',
+      deliveryMethod: body.deliveryMethod === 'standard' ? 'standard' : 'pickup',
       pickupPointId: body.pickupPointId || undefined,
       pickupPointName: body.pickupPointName || undefined,
       paymentMethod,
-      createdAt: new Date(),
     });
 
     await logAction({
       action: 'ORDER_CREATED',
       actor: session.user?.email || 'unknown',
       target: order.id!,
-      details: `Order placed for PHP ${serverTotal.toFixed(2)} with ${validatedItems.length} item(s) (${paymentMethod})`,
+      details: `Order placed for PHP ${order.total.toFixed(2)} with ${order.items.length} item(s) (${paymentMethod})`,
       createdAt: new Date(),
     });
 
     return NextResponse.json(order);
   } catch (error) {
+    if (error instanceof InsufficientStockError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    if (error instanceof ProductMissingError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    console.error('orders POST error:', error);
     return NextResponse.json({ error: 'Failed to create order' }, { status: 500 });
   }
 }

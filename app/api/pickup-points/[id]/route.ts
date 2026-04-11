@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { updatePickupPoint, deletePickupPoint } from '@/lib/pickup-points';
+import { updatePickupPoint } from '@/lib/pickup-points';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
@@ -37,7 +37,9 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
   try {
     const { id } = await params;
-    await deletePickupPoint(id);
+    // Soft delete: keep historical orders' pickupPointId references valid.
+    // GET /api/pickup-points already filters out inactive points for non-admins.
+    await updatePickupPoint(id, { isActive: false });
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to delete pickup point' }, { status: 500 });

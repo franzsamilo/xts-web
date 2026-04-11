@@ -37,6 +37,7 @@ const CartContext = createContext<CartContextType>({
 export const useCart = () => useContext(CartContext);
 
 const STORAGE_PREFIX = 'xts-cart-';
+export const PENDING_GCASH_ORDER_KEY = 'xts-pending-gcash-order';
 
 export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const { data: session } = useSession();
@@ -66,6 +67,36 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     }
     setMounted(true);
   }, [session?.user?.email]);
+
+  // After a GCash redirect, the user returns with cart still populated.
+  // If their pending order has been confirmed paid (webhook fired), clear the cart.
+  // If it failed, also clear the marker — they'll need to place a new order.
+  useEffect(() => {
+    if (!mounted || !session?.user?.email) return;
+    let cancelled = false;
+    const checkPendingPayment = async () => {
+      let pendingOrderId: string | null = null;
+      try {
+        pendingOrderId = localStorage.getItem(PENDING_GCASH_ORDER_KEY);
+      } catch {}
+      if (!pendingOrderId) return;
+      try {
+        const res = await fetch('/api/orders');
+        if (!res.ok) return;
+        const orders = (await res.json()) as Array<{ id: string; paymentStatus?: string }>;
+        const order = orders.find((o) => o.id === pendingOrderId);
+        if (cancelled || !order) return;
+        if (order.paymentStatus === 'paid') {
+          setItems([]);
+          try { localStorage.removeItem(PENDING_GCASH_ORDER_KEY); } catch {}
+        } else if (order.paymentStatus === 'failed') {
+          try { localStorage.removeItem(PENDING_GCASH_ORDER_KEY); } catch {}
+        }
+      } catch {}
+    };
+    checkPendingPayment();
+    return () => { cancelled = true; };
+  }, [mounted, session?.user?.email]);
 
   // Save to localStorage whenever items change
   useEffect(() => {
