@@ -132,7 +132,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <PageShell>
-      <div className="container mx-auto px-4 sm:px-6 py-16 sm:py-20">
+      <div className="container mx-auto px-4 sm:px-6 py-16 sm:py-20 pb-24 sm:pb-20">
         <Link href="/shop" className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] mb-8 sm:mb-10 transition-colors group">
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           <span className="text-[10px] font-black uppercase tracking-widest">Back to Shop</span>
@@ -281,6 +281,38 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           </div>
         </div>
       </div>
+
+      {/* Mobile Sticky Action Bar */}
+      {product && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-[var(--bg-primary)] border-t border-[var(--border-primary)] p-3 flex gap-2 sm:hidden">
+          <Button
+            className={`flex-1 h-11 text-xs uppercase font-black tracking-wider ${
+              added
+                ? 'bg-green-600 hover:bg-green-600'
+                : 'bg-safety-orange hover:bg-safety-orange/80'
+            }`}
+            onClick={handleAddToCart}
+            disabled={product.stock <= 0}
+          >
+            {added ? <><Check className="w-3.5 h-3.5 mr-1" /> Added</> : <><ShoppingCart className="w-3.5 h-3.5 mr-1" /> Add</>}
+          </Button>
+          <Button
+            className="flex-1 h-11 text-xs uppercase font-black tracking-wider bg-[var(--text-primary)] text-[var(--bg-primary)] hover:opacity-90"
+            onClick={handleBuyNow}
+            disabled={product.stock <= 0}
+          >
+            <Zap className="w-3.5 h-3.5 mr-1" /> Buy
+          </Button>
+          <Button
+            variant="outline"
+            className="h-11 px-3"
+            onClick={handleChatSeller}
+            disabled={chatLoading}
+          >
+            <MessageCircle className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
     </PageShell>
   );
 }
