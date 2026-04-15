@@ -82,7 +82,8 @@ export async function POST(req: NextRequest) {
     const existingChat = await findExistingChat(
       session.user.email,
       recipientId,
-      body?.productRef?.id
+      body?.productRef?.id,
+      body?.pickupRef?.pointId
     );
 
     if (existingChat) {

@@ -129,24 +129,31 @@ export async function addMessage(chatId: string, message: Omit<ChatMessage, 'id'
 export async function findExistingChat(
   participantA: string,
   participantB: string,
-  productId?: string
+  productId?: string,
+  pickupPointId?: string
 ): Promise<ChatData | null> {
   try {
-    let query = adminDb
+    const query = adminDb
       .collection('chats')
       .where('participants', 'array-contains', participantA);
 
     const snapshot = await query.get();
-    
+
     for (const doc of snapshot.docs) {
       const data = doc.data();
-      if (data.participants.includes(participantB)) {
-        if (productId && data.productRef?.id === productId) {
-          return { id: doc.id, ...data } as ChatData;
-        }
-        if (!productId && !data.productRef) {
-          return { id: doc.id, ...data } as ChatData;
-        }
+      if (!data.participants.includes(participantB)) continue;
+
+      // Match product chats by productRef.id
+      if (productId && data.productRef?.id === productId) {
+        return { id: doc.id, ...data } as ChatData;
+      }
+      // Match pickup chats by pickupRef.pointId
+      if (pickupPointId && data.pickupRef?.pointId === pickupPointId) {
+        return { id: doc.id, ...data } as ChatData;
+      }
+      // Match generic chats (no product, no pickup)
+      if (!productId && !pickupPointId && !data.productRef && !data.pickupRef) {
+        return { id: doc.id, ...data } as ChatData;
       }
     }
     return null;

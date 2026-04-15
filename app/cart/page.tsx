@@ -30,6 +30,7 @@ export default function CartPage() {
   const [checkingOut, setCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [orderPlaced, setOrderPlaced] = useState<string | null>(null);
+  const [pickupChatLoading, setPickupChatLoading] = useState(false);
 
   // Delivery state — default to pickup while standard delivery is disabled
   const [deliveryMethod, setDeliveryMethod] = useState<'standard' | 'pickup' | null>(
@@ -68,12 +69,17 @@ export default function CartPage() {
 
   const handlePickupChat = async () => {
     if (!session || !selectedPickup) return;
+    setPickupChatLoading(true);
     try {
+      // Route to the seller of the first item if available, otherwise admin inbox
+      const firstSeller = items.find(i => i.sellerId)?.sellerId;
+      const recipientId = firstSeller || ADMIN_INBOX_EMAIL;
+
       const res = await fetch('/api/chats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          recipientId: ADMIN_INBOX_EMAIL,
+          recipientId,
           type: 'pickup',
           initialMessage: `Hi! I'd like to arrange pickup at ${selectedPickup.name} (${selectedPickup.address}). I have ${cartCount} item(s) totaling ₱${cartTotal.toLocaleString()}.`,
           pickupRef: {
@@ -89,6 +95,8 @@ export default function CartPage() {
       }
     } catch (e) {
       console.error('Failed to create pickup chat', e);
+    } finally {
+      setPickupChatLoading(false);
     }
   };
 
@@ -215,8 +223,8 @@ export default function CartPage() {
 
   return (
     <PageShell>
-      <div className="container mx-auto px-6 py-20">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
+      <div className="container mx-auto px-4 sm:px-6 py-16 sm:py-20">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 sm:gap-8 mb-10 sm:mb-16">
           <SectionHeading
             title="Acquisition Queue"
             annotation={`${cartCount} Item${cartCount !== 1 ? 's' : ''} Staged`}
@@ -233,7 +241,7 @@ export default function CartPage() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
           <div className="lg:col-span-2 space-y-6">
             {/* Cart Items */}
             <AnimatePresence mode="popLayout">
@@ -246,13 +254,13 @@ export default function CartPage() {
                           {item.imageUrl ? (
                             <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                           ) : (
-                            <Package className="w-10 h-10 text-zinc-400" />
+                            <Package className="w-10 h-10 text-[var(--text-on-card-muted)]" />
                           )}
                         </div>
                       </Link>
                       <div className="flex-grow flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
-                          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block mb-1">
+                          <span className="text-[10px] font-black text-[var(--text-on-card-muted)] uppercase tracking-widest block mb-1">
                             {item.category || 'Hardware'} {item.sku ? `// ${item.sku}` : ''}
                           </span>
                           <Link href={`/shop/${item.id}`}>
@@ -271,7 +279,7 @@ export default function CartPage() {
                             </button>
                           </div>
                           <span className="text-base sm:text-lg font-black text-esd-dark sm:w-28 text-right">PHP {(item.price * item.quantity).toFixed(2)}</span>
-                          <button onClick={() => removeFromCart(item.id)} className="text-zinc-400 hover:text-red-500 transition-colors p-2 ml-auto sm:ml-0">
+                          <button onClick={() => removeFromCart(item.id)} className="text-[var(--text-on-card-muted)] hover:text-red-500 transition-colors p-2 ml-auto sm:ml-0">
                             <X className="w-4 h-4" />
                           </button>
                         </div>
@@ -465,10 +473,14 @@ export default function CartPage() {
                         >
                           <button
                             onClick={handlePickupChat}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-500/10 border border-blue-500/30 rounded-sm text-blue-400 hover:bg-blue-500/20 transition-colors"
+                            disabled={pickupChatLoading}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-500/10 border border-blue-500/30 rounded-sm text-blue-400 hover:bg-blue-500/20 transition-colors disabled:opacity-50"
                           >
-                            <MessageCircle className="w-4 h-4" />
-                            <span className="text-xs font-black uppercase tracking-widest">Chat about Pickup</span>
+                            {pickupChatLoading ? (
+                              <><Activity className="w-4 h-4 animate-spin" /><span className="text-xs font-black uppercase tracking-widest">Opening Chat...</span></>
+                            ) : (
+                              <><MessageCircle className="w-4 h-4" /><span className="text-xs font-black uppercase tracking-widest">Chat about Pickup</span></>
+                            )}
                           </button>
                           <p className="text-[9px] text-zinc-600 text-center mt-2">Coordinate pickup time and details with the seller</p>
                         </motion.div>
