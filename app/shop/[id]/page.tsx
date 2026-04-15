@@ -21,6 +21,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true);
   const [added, setAdded] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [chatLoading, setChatLoading] = useState(false);
   const { addToCart } = useCart();
 
   useEffect(() => {
@@ -55,6 +56,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       sku: product.sku,
       tag: product.tag,
       imageUrl: product.imageUrls?.[0] || '',
+      sellerId: product.sellerId || undefined,
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
@@ -70,16 +72,19 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       router.push('/login');
       return;
     }
+    setChatLoading(true);
     try {
-      const userName = session.user.name || 'A customer';
       const productPrice = parseFloat(product.price).toLocaleString('en-PH', { minimumFractionDigits: 2 });
       const initialMessage = `Hi! I'm interested in this product:\n\n📦 ${product.name}\n🏷️ SKU: ${product.sku}\n💰 Price: ₱${productPrice}\n📂 Category: ${product.category}\n\nCould you help me with more details?`;
+
+      // Route to the product's seller if available, otherwise fall back to admin inbox
+      const recipientId = product.sellerId || ADMIN_INBOX_EMAIL;
 
       const res = await fetch('/api/chats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          recipientId: ADMIN_INBOX_EMAIL,
+          recipientId,
           type: 'product',
           productRef: {
             id: product.id,
@@ -91,10 +96,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         }),
       });
       if (res.ok) {
-        router.push('/chat');
+        const chat = await res.json();
+        router.push(`/chat?id=${chat.id}`);
       }
     } catch (e) {
       console.error('Failed to start chat', e);
+    } finally {
+      setChatLoading(false);
     }
   };
 
@@ -261,8 +269,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 variant="outline"
                 className="w-full h-10 sm:h-12 text-xs uppercase font-black tracking-wider flex items-center justify-center gap-2"
                 onClick={handleChatSeller}
+                disabled={chatLoading}
               >
-                <MessageCircle className="w-4 h-4" /> Chat Seller about this Product
+                {chatLoading ? (
+                  <><Activity className="w-4 h-4 animate-spin" /> Opening Chat...</>
+                ) : (
+                  <><MessageCircle className="w-4 h-4" /> Chat Seller about this Product</>
+                )}
               </Button>
             </div>
           </div>
