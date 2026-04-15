@@ -40,7 +40,7 @@ export async function getChatsByUser(userId: string): Promise<ChatData[]> {
       .orderBy('lastMessageAt', 'desc')
       .get();
 
-    return snapshot.docs.map(doc => {
+    const chats = snapshot.docs.map(doc => {
       const data = doc.data();
       const lastMessageAt = data.lastMessageAt?.toDate?.()?.toISOString?.() || new Date().toISOString();
       const lastReadBy = data.lastReadBy || {};
@@ -56,6 +56,11 @@ export async function getChatsByUser(userId: string): Promise<ChatData[]> {
         hasUnread: data.lastMessage ? hasUnread : false,
       };
     }) as ChatData[];
+
+    return chats.filter(chat => {
+      const deletedBy: string[] = (chat as any).deletedBy || [];
+      return !deletedBy.includes(userId);
+    });
   } catch (error) {
     console.error('Error fetching chats:', error);
     return [];
@@ -151,14 +156,11 @@ export async function findExistingChat(
   }
 }
 
-export async function deleteChat(chatId: string): Promise<void> {
-  // Delete all messages in the subcollection first
-  const messagesSnap = await adminDb.collection('chats').doc(chatId).collection('messages').get();
-  const batch = adminDb.batch();
-  messagesSnap.docs.forEach(doc => batch.delete(doc.ref));
-  await batch.commit();
-  // Delete the chat document
-  await adminDb.collection('chats').doc(chatId).delete();
+export async function softDeleteChat(chatId: string, userId: string): Promise<void> {
+  const { FieldValue } = await import('firebase-admin/firestore');
+  await adminDb.collection('chats').doc(chatId).update({
+    deletedBy: FieldValue.arrayUnion(userId),
+  });
 }
 
 export async function markChatAsRead(chatId: string, userId: string): Promise<void> {

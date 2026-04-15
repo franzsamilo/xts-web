@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMessages, addMessage, getChatById, deleteChat, markChatAsRead } from '@/lib/chat';
+import { getMessages, addMessage, getChatById, softDeleteChat, markChatAsRead } from '@/lib/chat';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
@@ -67,18 +67,16 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     }
 
     const { id } = await params;
-    const role = (session.user as any)?.role || '';
 
-    // Only participants or admins can delete
     const chat = await getChatById(id);
     if (!chat) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
-    if (!chat.participants.includes(session.user.email) && !role.includes('admin')) {
+    if (!chat.participants.includes(session.user.email)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    await deleteChat(id);
+    await softDeleteChat(id, session.user.email);
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to delete chat' }, { status: 500 });

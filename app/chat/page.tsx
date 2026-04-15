@@ -392,7 +392,7 @@ function ChatPageInner() {
       <ConfirmModal
         open={deleteConfirm.open}
         title="Delete Conversation"
-        message="This will permanently delete this conversation and all its messages. This cannot be undone."
+        message="This conversation will be hidden from your view. The other participant can still see it."
         variant="danger"
         confirmLabel="Delete"
         cancelLabel="Keep"
