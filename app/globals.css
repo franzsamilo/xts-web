@@ -29,6 +29,8 @@
   --text-secondary: #a1a1aa;
   --text-muted: #71717a;
   --text-on-card: #2C2F33;
+  --text-on-card-muted: #6b7280;
+  --text-on-card-secondary: #4b5563;
   --text-on-input: #e4e4e7;
   --border-primary: rgba(255,255,255,0.1);
   --border-secondary: rgba(255,255,255,0.05);
@@ -54,6 +56,8 @@
   --text-secondary: #52525b;
   --text-muted: #a1a1aa;
   --text-on-card: #1a1a2e;
+  --text-on-card-muted: #6b7280;
+  --text-on-card-secondary: #4b5563;
   --text-on-input: #1a1a2e;
   --border-primary: rgba(0,0,0,0.1);
   --border-secondary: rgba(0,0,0,0.05);

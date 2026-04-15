@@ -12,6 +12,7 @@ interface CartItem {
   sku?: string;
   tag?: string;
   imageUrl?: string;
+  sellerId?: string;
 }
 
 interface CartContextType {

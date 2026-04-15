@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(node -e \":*)",
+      "Bash(npm run:*)",
+      "Bash(npx tsc:*)",
+      "WebFetch(domain:www.aftership.com)",
+      "WebSearch",
+      "WebFetch(domain:www.trackingmore.com)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

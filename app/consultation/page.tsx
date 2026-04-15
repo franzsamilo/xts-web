@@ -129,9 +129,9 @@ export default function ConsultationPage() {
                         <option.icon className="w-5 h-5 text-safety-orange group-hover:text-white" />
                       </div>
                       <h4 className="text-lg font-black text-[var(--text-on-card)] uppercase mb-2">{option.name}</h4>
-                      <p className="text-xs text-[var(--text-muted)] leading-relaxed mb-4">{option.description}</p>
+                      <p className="text-xs text-[var(--text-on-card-muted)] leading-relaxed mb-4">{option.description}</p>
                       <div className="flex items-center justify-end pt-3 border-t border-[var(--border-secondary)]">
-                        <ArrowRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-safety-orange group-hover:translate-x-1 transition-all" />
+                        <ArrowRight className="w-4 h-4 text-[var(--text-on-card-muted)] group-hover:text-safety-orange group-hover:translate-x-1 transition-all" />
                       </div>
                     </Card>
                   </motion.div>
