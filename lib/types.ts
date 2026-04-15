@@ -60,6 +60,14 @@ export interface ConsultationDTO {
   createdAt: string;
 }
 
+export interface ConsultationMessageDTO {
+  id: string;
+  senderId: string;
+  senderName: string;
+  content: string;
+  createdAt: string;
+}
+
 export interface FabJobDTO {
   id: string;
   name: string;

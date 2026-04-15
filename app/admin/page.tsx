@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { Package, Users, Activity, Settings, Plus, Search, Hammer, AlertTriangle, MessageCircle, X, ClipboardList, Truck, CheckCircle2, ArrowUpDown, MapPin, Trash2, Edit2, Download } from 'lucide-react';
+import { Package, Users, Activity, Settings, Plus, Search, Hammer, AlertTriangle, MessageCircle, X, ClipboardList, Truck, CheckCircle2, ArrowUpDown, MapPin, Trash2, Edit2, Download, Send } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { useSession } from 'next-auth/react';
@@ -46,6 +46,12 @@ function AdminPanel() {
     slot: string;
   } | null>(null);
   const [savingConsultation, setSavingConsultation] = React.useState(false);
+  const [consultationMessages, setConsultationMessages] = React.useState<any[]>([]);
+  const [loadingConsultationMessages, setLoadingConsultationMessages] = React.useState(false);
+  const [newConsultationMessage, setNewConsultationMessage] = React.useState('');
+  const [sendingConsultationMessage, setSendingConsultationMessage] = React.useState(false);
+  const consultationMessagesEndRef = React.useRef<HTMLDivElement>(null);
+  const consultationMessagesContainerRef = React.useRef<HTMLDivElement>(null);
 
   const [fabJobs, setFabJobs] = React.useState<any[]>([]);
   const [loadingFabJobs, setLoadingFabJobs] = React.useState(true);
@@ -254,6 +260,52 @@ function AdminPanel() {
       console.error('Failed to save consultation edits', e);
     } finally {
       setSavingConsultation(false);
+    }
+  };
+
+  const fetchConsultationMessages = async (consultationId: string) => {
+    setLoadingConsultationMessages(true);
+    try {
+      const res = await fetch(`/api/consultations/${consultationId}/messages`);
+      if (res.ok) {
+        const msgs = await res.json();
+        setConsultationMessages(msgs);
+        setTimeout(() => {
+          if (consultationMessagesContainerRef.current) {
+            consultationMessagesContainerRef.current.scrollTop = consultationMessagesContainerRef.current.scrollHeight;
+          }
+        }, 100);
+      }
+    } catch (e) {
+      console.error('Failed to fetch consultation messages', e);
+    } finally {
+      setLoadingConsultationMessages(false);
+    }
+  };
+
+  const sendConsultationMessage = async () => {
+    if (!newConsultationMessage.trim() || !selectedConsultation) return;
+    setSendingConsultationMessage(true);
+    try {
+      const res = await fetch(`/api/consultations/${selectedConsultation.id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: newConsultationMessage.trim() }),
+      });
+      if (res.ok) {
+        const msg = await res.json();
+        setConsultationMessages(prev => [...prev, { ...msg, createdAt: new Date().toISOString() }]);
+        setNewConsultationMessage('');
+        setTimeout(() => {
+          if (consultationMessagesContainerRef.current) {
+            consultationMessagesContainerRef.current.scrollTop = consultationMessagesContainerRef.current.scrollHeight;
+          }
+        }, 100);
+      }
+    } catch (e) {
+      console.error('Failed to send consultation message', e);
+    } finally {
+      setSendingConsultationMessage(false);
     }
   };
 
@@ -920,6 +972,7 @@ function AdminPanel() {
                               expertPrice: consult.expertPrice || '',
                               slot: consult.slot || '',
                             });
+                            fetchConsultationMessages(consult.id);
                           }}>Details</Button>
                       </div>
                     </Card>
@@ -939,7 +992,7 @@ function AdminPanel() {
       {/* Consultation Detail Modal */}
       <AnimatePresence>
         {selectedConsultation && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setSelectedConsultation(null); setConsultationEdits(null); }}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setSelectedConsultation(null); setConsultationEdits(null); setConsultationMessages([]); }}>
             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-white/10 rounded-sm shadow-2xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col">
               <div className="bg-safety-orange p-1">
                 <div className="bg-zinc-900 p-6 flex items-center justify-between">
@@ -947,7 +1000,7 @@ function AdminPanel() {
                     <h3 className="text-xl font-black text-white uppercase tracking-tighter">Session Details</h3>
                     <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">{selectedConsultation.consultationType?.replace('-', ' ') || 'General Consultation'}</p>
                   </div>
-                  <button onClick={() => { setSelectedConsultation(null); setConsultationEdits(null); }} className="text-zinc-500 hover:text-white"><X className="w-5 h-5" /></button>
+                  <button onClick={() => { setSelectedConsultation(null); setConsultationEdits(null); setConsultationMessages([]); }} className="text-zinc-500 hover:text-white"><X className="w-5 h-5" /></button>
                 </div>
               </div>
               <div className="p-6 overflow-y-auto flex-grow custom-scrollbar space-y-5">
@@ -1064,6 +1117,57 @@ function AdminPanel() {
                     </div>
                   </div>
                 )}
+
+                {/* Consultation Chat */}
+                <div>
+                  <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Consultation Chat</p>
+                  <div className="border border-white/5 rounded-sm overflow-hidden bg-black/20">
+                    <div
+                      ref={consultationMessagesContainerRef}
+                      className="h-48 overflow-y-auto p-3 space-y-2"
+                    >
+                      {loadingConsultationMessages ? (
+                        <div className="flex justify-center py-6"><Activity className="w-5 h-5 text-safety-orange animate-spin" /></div>
+                      ) : consultationMessages.length > 0 ? (
+                        consultationMessages.map((msg: any) => {
+                          const isAdmin = msg.senderId === session?.user?.email;
+                          return (
+                            <div key={msg.id} className={`flex ${isAdmin ? 'justify-end' : 'justify-start'}`}>
+                              <div className={`max-w-[80%] px-3 py-2 rounded-sm ${
+                                isAdmin ? 'bg-safety-orange text-white' : 'bg-zinc-800 text-zinc-300 border border-white/5'
+                              }`}>
+                                <p className="text-xs">{msg.content}</p>
+                                <p className={`text-[9px] mt-1 ${isAdmin ? 'text-white/50' : 'text-zinc-600'}`}>
+                                  {msg.senderName} · {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <p className="text-center text-[10px] text-zinc-600 py-6">No messages yet. Start the conversation.</p>
+                      )}
+                      <div ref={consultationMessagesEndRef} />
+                    </div>
+                    <div className="p-2 border-t border-white/5 flex gap-2">
+                      <Input
+                        placeholder="Type a message..."
+                        value={newConsultationMessage}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewConsultationMessage(e.target.value)}
+                        onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendConsultationMessage(); } }}
+                        className="flex-grow h-9 text-xs bg-zinc-800 border-white/10 text-white"
+                      />
+                      <Button
+                        size="sm"
+                        className="px-3 h-9"
+                        onClick={sendConsultationMessage}
+                        disabled={!newConsultationMessage.trim() || sendingConsultationMessage}
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Actions */}
                 <div className="pt-4 border-t border-white/5 flex gap-3">

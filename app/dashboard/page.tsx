@@ -7,10 +7,11 @@ import { PageShell } from '@/components/layout/PageShell';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { ServiceQueue } from '@/components/fabrication/ServiceQueue';
-import { Package, Settings, PenTool, LayoutDashboard, History, MessageCircle, User as UserIcon, ShoppingBag, LogOut, Mail, Shield, Activity, Truck, MapPin, Banknote, CreditCard } from 'lucide-react';
+import { Package, Settings, PenTool, LayoutDashboard, History, MessageCircle, User as UserIcon, ShoppingBag, LogOut, Mail, Shield, Activity, Truck, MapPin, Banknote, CreditCard, Send } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 
 export default function DashboardPage() {
@@ -22,6 +23,12 @@ export default function DashboardPage() {
   const [loadingData, setLoadingData] = useState(true);
   const [payBusyId, setPayBusyId] = useState<string | null>(null);
   const [payError, setPayError] = useState<string | null>(null);
+  const [selectedConsultChat, setSelectedConsultChat] = useState<string | null>(null);
+  const [consultMessages, setConsultMessages] = useState<any[]>([]);
+  const [loadingConsultMsgs, setLoadingConsultMsgs] = useState(false);
+  const [newConsultMsg, setNewConsultMsg] = useState('');
+  const [sendingConsultMsg, setSendingConsultMsg] = useState(false);
+  const consultMsgsRef = React.useRef<HTMLDivElement>(null);
 
   const resumeGcashPayment = async (orderId: string) => {
     setPayBusyId(orderId);
@@ -40,6 +47,49 @@ export default function DashboardPage() {
       window.location.assign(data.checkoutUrl);
     } finally {
       setPayBusyId(null);
+    }
+  };
+
+  const openConsultChat = async (consultationId: string) => {
+    setSelectedConsultChat(consultationId);
+    setLoadingConsultMsgs(true);
+    try {
+      const res = await fetch(`/api/consultations/${consultationId}/messages`);
+      if (res.ok) {
+        const msgs = await res.json();
+        setConsultMessages(msgs);
+        setTimeout(() => {
+          if (consultMsgsRef.current) consultMsgsRef.current.scrollTop = consultMsgsRef.current.scrollHeight;
+        }, 100);
+      }
+    } catch (e) {
+      console.error('Failed to fetch consultation messages', e);
+    } finally {
+      setLoadingConsultMsgs(false);
+    }
+  };
+
+  const sendConsultMsg = async () => {
+    if (!newConsultMsg.trim() || !selectedConsultChat) return;
+    setSendingConsultMsg(true);
+    try {
+      const res = await fetch(`/api/consultations/${selectedConsultChat}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: newConsultMsg.trim() }),
+      });
+      if (res.ok) {
+        const msg = await res.json();
+        setConsultMessages(prev => [...prev, { ...msg, createdAt: new Date().toISOString() }]);
+        setNewConsultMsg('');
+        setTimeout(() => {
+          if (consultMsgsRef.current) consultMsgsRef.current.scrollTop = consultMsgsRef.current.scrollHeight;
+        }, 100);
+      }
+    } catch (e) {
+      console.error('Failed to send message', e);
+    } finally {
+      setSendingConsultMsg(false);
     }
   };
 
@@ -68,9 +118,9 @@ export default function DashboardPage() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
           <div className="flex items-center gap-6">
             {session?.user?.image ? (
-              <img src={session.user.image} alt="Profile" className="w-20 h-20 rounded-sm border-2 border-safety-orange p-1 shadow-2xl" />
+              <img src={session.user.image} alt="Profile" className="w-14 h-14 sm:w-20 sm:h-20 rounded-sm border-2 border-safety-orange p-1 shadow-2xl" />
             ) : (
-              <div className="w-20 h-20 bg-zinc-800 rounded-sm flex items-center justify-center border-2 border-safety-orange shadow-2xl">
+              <div className="w-14 h-14 sm:w-20 sm:h-20 bg-zinc-800 rounded-sm flex items-center justify-center border-2 border-safety-orange shadow-2xl">
                 <UserIcon className="w-10 h-10 text-white opacity-20" />
               </div>
             )}
@@ -79,7 +129,7 @@ export default function DashboardPage() {
                 <Badge>ID: #{session?.user?.email?.split('@')[0].toUpperCase().slice(0, 7) || 'ENG-9902'}</Badge>
                 <Badge variant="new" className="bg-safety-orange text-white">{userRole.toUpperCase()}</Badge>
               </div>
-              <h2 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter leading-none">
+              <h2 className="text-2xl sm:text-4xl md:text-5xl font-black text-white uppercase tracking-tighter leading-none">
                 {session?.user?.name || 'Engineer'}
               </h2>
               <p className="font-handwriting text-safety-orange mt-1">Status: Operational // {session?.user?.email}</p>
@@ -100,10 +150,10 @@ export default function DashboardPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-12">
             {/* Dashboard Nav */}
             <div className="space-y-2">
-              <TabsList className="flex flex-col h-auto bg-transparent p-0 gap-2 items-start">
+              <TabsList className="flex flex-row lg:flex-col h-auto bg-transparent p-0 gap-1 lg:gap-2 items-start overflow-x-auto pb-2 lg:pb-0">
                 <TabsTrigger value="overview" className="group w-full p-0 bg-transparent data-[state=active]:bg-transparent border-none">
                    <DashboardTabContent icon={LayoutDashboard} label="Overview" />
                 </TabsTrigger>
@@ -183,9 +233,9 @@ export default function DashboardPage() {
                       userOrders.slice(0, 5).map(order => (
                         <Card key={order.id} className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                           <div>
-                            <span className="text-xs font-black text-zinc-400 uppercase tracking-widest">{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'Recent'}</span>
+                            <span className="text-xs font-black text-[var(--text-on-card-muted)] uppercase tracking-widest">{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'Recent'}</span>
                             <h4 className="text-xl font-bold text-esd-dark mt-1">#{order.id?.slice(0, 8).toUpperCase()}</h4>
-                            <p className="text-zinc-600 text-sm">{(order.items || []).map((i: any) => i.name).join(', ')}</p>
+                            <p className="text-[var(--text-on-card-secondary)] text-sm">{(order.items || []).map((i: any) => i.name).join(', ')}</p>
                             {order.deliveryMethod && (
                               <div className="flex items-center gap-1.5 mt-1">
                                 {order.deliveryMethod === 'pickup' ? (
@@ -236,11 +286,11 @@ export default function DashboardPage() {
                     {userOrders.map(order => (
                       <Card key={order.id} className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                         <div>
-                          <span className="text-xs font-black text-zinc-400 uppercase tracking-widest">{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'Recent'}</span>
+                          <span className="text-xs font-black text-[var(--text-on-card-muted)] uppercase tracking-widest">{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'Recent'}</span>
                           <h4 className="text-xl font-bold text-esd-dark mt-1">#{order.id?.slice(0, 8).toUpperCase()}</h4>
                           <div className="mt-2 space-y-1">
                             {(order.items || []).map((item: any, i: number) => (
-                              <p key={i} className="text-xs text-zinc-500">{item.name} x{item.quantity} — PHP {(item.price * item.quantity).toFixed(2)}</p>
+                              <p key={i} className="text-xs text-[var(--text-on-card-muted)]">{item.name} x{item.quantity} — PHP {(item.price * item.quantity).toFixed(2)}</p>
                             ))}
                           </div>
                         </div>
@@ -301,14 +351,64 @@ export default function DashboardPage() {
                         <div className="flex justify-between items-start mb-4">
                           <div>
                             <h4 className="text-lg font-black text-esd-dark uppercase">{c.expertName}</h4>
-                            <p className="text-xs text-zinc-500">{c.expertTitle}</p>
+                            <p className="text-xs text-[var(--text-on-card-muted)]">{c.expertTitle}</p>
                           </div>
                           <Badge variant={c.status === 'confirmed' ? 'completed' : 'pending'}>{(c.status || 'pending').toUpperCase()}</Badge>
                         </div>
                         <div className="flex items-center gap-4 p-3 bg-zinc-100 rounded-sm">
                           <Activity className="w-4 h-4 text-safety-orange" />
-                          <span className="text-xs font-mono text-zinc-600">{c.slot || 'TBD'} — {c.expertPrice}</span>
+                          <span className="text-xs font-mono text-[var(--text-on-card-secondary)]">{c.slot || 'TBD'} — {c.expertPrice}</span>
                         </div>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-3 w-full text-[10px] uppercase font-black"
+                          onClick={() => selectedConsultChat === c.id ? setSelectedConsultChat(null) : openConsultChat(c.id)}
+                        >
+                          <MessageCircle className="w-3 h-3 mr-1" />
+                          {selectedConsultChat === c.id ? 'Close Chat' : 'Chat with Expert'}
+                        </Button>
+
+                        {selectedConsultChat === c.id && (
+                          <div className="mt-3 border border-[var(--border-primary)] rounded-sm overflow-hidden">
+                            <div ref={consultMsgsRef} className="h-40 overflow-y-auto p-3 space-y-2 bg-[var(--bg-surface)]">
+                              {loadingConsultMsgs ? (
+                                <div className="flex justify-center py-4"><Activity className="w-5 h-5 text-safety-orange animate-spin" /></div>
+                              ) : consultMessages.length > 0 ? (
+                                consultMessages.map((msg: any) => {
+                                  const isMe = msg.senderId === session?.user?.email;
+                                  return (
+                                    <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                      <div className={`max-w-[80%] px-3 py-2 rounded-sm ${
+                                        isMe ? 'bg-safety-orange text-white' : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-primary)]'
+                                      }`}>
+                                        <p className="text-xs">{msg.content}</p>
+                                        <p className={`text-[9px] mt-1 ${isMe ? 'text-white/50' : 'text-[var(--text-muted)]'}`}>
+                                          {msg.senderName} · {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                              ) : (
+                                <p className="text-center text-[10px] text-[var(--text-muted)] py-4">No messages yet.</p>
+                              )}
+                            </div>
+                            <div className="p-2 border-t border-[var(--border-primary)] flex gap-2 bg-[var(--bg-surface)]">
+                              <Input
+                                placeholder="Type a message..."
+                                value={newConsultMsg}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewConsultMsg(e.target.value)}
+                                onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendConsultMsg(); } }}
+                                className="flex-grow h-8 text-xs"
+                              />
+                              <Button size="sm" className="px-3 h-8" onClick={sendConsultMsg} disabled={!newConsultMsg.trim() || sendingConsultMsg}>
+                                <Send className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </Card>
                     ))}
                   </div>
@@ -336,7 +436,7 @@ export default function DashboardPage() {
                        </div>
                        <div>
                          <h4 className="text-xl font-black text-esd-dark uppercase mb-2">Become an Expert</h4>
-                         <p className="text-xs text-zinc-600 leading-relaxed font-medium">Offer technical consultations, design reviews, and engineering advice to the community. Get paid for your expertise.</p>
+                         <p className="text-xs text-[var(--text-on-card-secondary)] leading-relaxed font-medium">Offer technical consultations, design reviews, and engineering advice to the community. Get paid for your expertise.</p>
                        </div>
                     </div>
                   </Card>
@@ -348,7 +448,7 @@ export default function DashboardPage() {
                        </div>
                        <div>
                          <h4 className="text-xl font-black text-esd-dark uppercase mb-2">Register as Vendor</h4>
-                         <p className="text-xs text-zinc-600 leading-relaxed font-medium">List your hardware, components, and tools on the XTS marketplace. Reach thousands of engineers.</p>
+                         <p className="text-xs text-[var(--text-on-card-secondary)] leading-relaxed font-medium">List your hardware, components, and tools on the XTS marketplace. Reach thousands of engineers.</p>
                        </div>
                     </div>
                   </Card>

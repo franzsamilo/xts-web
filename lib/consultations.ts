@@ -97,3 +97,52 @@ export async function getConsultationById(id: string): Promise<ConsultationData 
     return null;
   }
 }
+
+export interface ConsultationMessage {
+  id?: string;
+  senderId: string;
+  senderName: string;
+  content: string;
+  createdAt: Date | any;
+}
+
+export async function getConsultationMessages(consultationId: string): Promise<ConsultationMessage[]> {
+  try {
+    const snapshot = await adminDb
+      .collection('consultations')
+      .doc(consultationId)
+      .collection('messages')
+      .orderBy('createdAt', 'asc')
+      .get();
+
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
+    })) as ConsultationMessage[];
+  } catch (error) {
+    console.error('Error fetching consultation messages:', error);
+    return [];
+  }
+}
+
+export async function addConsultationMessage(
+  consultationId: string,
+  message: Omit<ConsultationMessage, 'id'>
+): Promise<ConsultationMessage> {
+  const docRef = await adminDb
+    .collection('consultations')
+    .doc(consultationId)
+    .collection('messages')
+    .add({
+      ...message,
+      createdAt: new Date(),
+    });
+
+  await adminDb.collection('consultations').doc(consultationId).update({
+    lastMessage: message.content,
+    lastMessageAt: new Date(),
+  });
+
+  return { id: docRef.id, ...message };
+}
