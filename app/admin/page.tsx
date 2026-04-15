@@ -38,6 +38,14 @@ function AdminPanel() {
 
   const [consultations, setConsultations] = React.useState<any[]>([]);
   const [loadingConsultations, setLoadingConsultations] = React.useState(true);
+  const [selectedConsultation, setSelectedConsultation] = React.useState<any | null>(null);
+  const [consultationEdits, setConsultationEdits] = React.useState<{
+    expertName: string;
+    expertId: string;
+    expertPrice: string;
+    slot: string;
+  } | null>(null);
+  const [savingConsultation, setSavingConsultation] = React.useState(false);
 
   const [fabJobs, setFabJobs] = React.useState<any[]>([]);
   const [loadingFabJobs, setLoadingFabJobs] = React.useState(true);
@@ -209,20 +217,47 @@ function AdminPanel() {
     }
   };
 
-  const confirmSession = async (id: string) => {
+  const updateConsultation = async (id: string, status: string) => {
     try {
       const res = await fetch(`/api/consultations/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'confirmed' }),
+        body: JSON.stringify({ status }),
       });
       if (res.ok) {
-        setConsultations(prev => prev.map(s => s.id === id ? { ...s, status: 'confirmed' } : s));
+        setConsultations(prev => prev.map(s => s.id === id ? { ...s, status } : s));
+        if (selectedConsultation?.id === id) {
+          setSelectedConsultation((prev: any) => prev ? { ...prev, status } : null);
+        }
       }
     } catch (e) {
-      console.error('Failed to confirm session', e);
+      console.error('Failed to update consultation', e);
     }
   };
+
+  const saveConsultationEdits = async () => {
+    if (!selectedConsultation || !consultationEdits) return;
+    setSavingConsultation(true);
+    try {
+      const res = await fetch(`/api/consultations/${selectedConsultation.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(consultationEdits),
+      });
+      if (res.ok) {
+        const updated = { ...selectedConsultation, ...consultationEdits };
+        setConsultations(prev => prev.map(c => c.id === selectedConsultation.id ? updated : c));
+        setSelectedConsultation(updated);
+        setConsultationEdits(null);
+      }
+    } catch (e) {
+      console.error('Failed to save consultation edits', e);
+    } finally {
+      setSavingConsultation(false);
+    }
+  };
+
+  const confirmSession = async (id: string) => updateConsultation(id, 'confirmed');
 
   const updateFabJob = async (id: string, status: string, progress: number) => {
     try {
@@ -829,46 +864,229 @@ function AdminPanel() {
               <div className="py-20 flex justify-center"><Activity className="w-8 h-8 text-safety-orange animate-spin" /></div>
             ) : consultations.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {consultations.map((consult: any) => (
+                  {consultations.map((consult: any) => {
+                    const statusVariant = consult.status === 'confirmed' ? 'completed' : consult.status === 'cancelled' ? 'warning' : consult.status === 'completed' ? 'completed' : 'pending';
+                    return (
                     <Card key={consult.id} className="border border-white/5 bg-black/40">
-                      <div className="flex justify-between items-start mb-6">
+                      <div className="flex justify-between items-start mb-4">
                         <div>
-                            <Badge variant="new" className="mb-2 uppercase">Session Protocol</Badge>
+                            <Badge variant="new" className="mb-2 uppercase">{consult.consultationType?.replace('-', ' ') || 'General'}</Badge>
                             <h4 className="text-xl font-black text-white uppercase tracking-tight">{consult.expertName}</h4>
                             <p className="text-xs text-zinc-500 font-medium">Client: {consult.clientName || consult.clientEmail}</p>
                             <p className="text-[10px] text-zinc-600 font-mono mt-1">{consult.expertTitle}</p>
                         </div>
-                        <Badge variant={consult.status === 'confirmed' ? 'completed' : 'pending'}>
+                        <Badge variant={statusVariant}>
                           {(consult.status || 'pending').toUpperCase()}
                         </Badge>
                       </div>
 
-                      <div className="flex items-center gap-4 p-4 bg-zinc-900/50 rounded-sm mb-6 border border-white/5">
+                      <div className="flex items-center gap-4 p-4 bg-zinc-900/50 rounded-sm mb-4 border border-white/5">
                           <Activity className="w-4 h-4 text-safety-orange" />
                           <span className="text-xs font-mono text-zinc-400">{consult.slot || 'TBD'} — {consult.expertPrice}</span>
                       </div>
 
-                      <div className="flex gap-4">
-                          {consult.status === 'pending' ? (
-                            <Button className="flex-grow bg-green-600 hover:bg-green-700 uppercase font-black text-[10px]" onClick={() => confirmSession(consult.id)}>Accept Session</Button>
-                          ) : (
-                            <Button className="flex-grow bg-safety-orange hover:bg-safety-orange/80 uppercase font-black text-[10px]">Prepare Files</Button>
+                      {consult.projectDescription && (
+                        <div className="mb-4 p-3 bg-zinc-900/30 rounded-sm border border-white/5">
+                          <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Project Brief</p>
+                          <p className="text-xs text-zinc-400 line-clamp-2">{consult.projectDescription}</p>
+                        </div>
+                      )}
+
+                      <div className="flex gap-3">
+                          {consult.status === 'pending' && (
+                            <>
+                              <Button className="flex-grow bg-green-600 hover:bg-green-700 uppercase font-black text-[10px]" onClick={() => confirmSession(consult.id)}>Accept</Button>
+                              <Button className="flex-grow bg-red-600/80 hover:bg-red-600 uppercase font-black text-[10px]" onClick={() => updateConsultation(consult.id, 'cancelled')}>Decline</Button>
+                            </>
                           )}
-                          <Button variant="outline" className="flex-grow uppercase font-black text-[10px]">Details</Button>
+                          {consult.status === 'confirmed' && (
+                            <>
+                              <Button className="flex-grow bg-green-600 hover:bg-green-700 uppercase font-black text-[10px]" onClick={() => updateConsultation(consult.id, 'completed')}>
+                                <CheckCircle2 className="w-3 h-3 mr-1" /> Complete
+                              </Button>
+                              <Button className="flex-grow bg-red-600/80 hover:bg-red-600 uppercase font-black text-[10px]" onClick={() => updateConsultation(consult.id, 'cancelled')}>Cancel</Button>
+                            </>
+                          )}
+                          {(consult.status === 'completed' || consult.status === 'cancelled') && (
+                            <Badge variant={consult.status === 'completed' ? 'completed' : 'warning'} className="text-[8px] px-3 py-1">
+                              {consult.status.toUpperCase()}
+                            </Badge>
+                          )}
+                          <Button variant="outline" className="flex-grow uppercase font-black text-[10px]" onClick={() => {
+                            setSelectedConsultation(consult);
+                            setConsultationEdits({
+                              expertName: consult.expertName || '',
+                              expertId: consult.expertId || '',
+                              expertPrice: consult.expertPrice || '',
+                              slot: consult.slot || '',
+                            });
+                          }}>Details</Button>
                       </div>
                     </Card>
-                  ))}
+                  );})}
               </div>
             ) : (
-              <EmptyTerminalState 
-                icon={MessageCircle} 
-                title="No Sessions" 
-                description="Engineering consultation docket is currently clear." 
+              <EmptyTerminalState
+                icon={MessageCircle}
+                title="No Sessions"
+                description="Engineering consultation docket is currently clear."
               />
             )}
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Consultation Detail Modal */}
+      <AnimatePresence>
+        {selectedConsultation && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setSelectedConsultation(null); setConsultationEdits(null); }}>
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-white/10 rounded-sm shadow-2xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col">
+              <div className="bg-safety-orange p-1">
+                <div className="bg-zinc-900 p-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-black text-white uppercase tracking-tighter">Session Details</h3>
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">{selectedConsultation.consultationType?.replace('-', ' ') || 'General Consultation'}</p>
+                  </div>
+                  <button onClick={() => { setSelectedConsultation(null); setConsultationEdits(null); }} className="text-zinc-500 hover:text-white"><X className="w-5 h-5" /></button>
+                </div>
+              </div>
+              <div className="p-6 overflow-y-auto flex-grow custom-scrollbar space-y-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Status</p>
+                    <Badge variant={selectedConsultation.status === 'confirmed' ? 'completed' : selectedConsultation.status === 'cancelled' ? 'warning' : selectedConsultation.status === 'completed' ? 'completed' : 'pending'} className="mt-1">
+                      {(selectedConsultation.status || 'pending').toUpperCase()}
+                    </Badge>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Submitted</p>
+                    <p className="text-xs text-zinc-400 font-mono mt-1">{selectedConsultation.createdAt ? new Date(selectedConsultation.createdAt).toLocaleDateString() : 'N/A'}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Client</p>
+                    <p className="text-sm text-white font-bold">{selectedConsultation.clientName}</p>
+                    <p className="text-[10px] text-zinc-500 font-mono">{selectedConsultation.clientEmail}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Assigned Expert</p>
+                    <p className="text-sm text-white font-bold">{selectedConsultation.expertName}</p>
+                    <p className="text-[10px] text-zinc-500 font-mono">{selectedConsultation.expertTitle}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Schedule</p>
+                    <p className="text-xs text-zinc-300 font-medium">{selectedConsultation.slot || 'TBD'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Budget</p>
+                    <p className="text-xs text-zinc-300 font-medium">{selectedConsultation.expertPrice || 'TBD'}</p>
+                  </div>
+                </div>
+
+                {/* Editable Fields */}
+                {consultationEdits && (selectedConsultation.status === 'pending' || selectedConsultation.status === 'confirmed') && (
+                  <div className="space-y-4 p-4 bg-black/20 rounded-sm border border-white/5">
+                    <p className="text-[10px] font-black text-safety-orange uppercase tracking-widest">Edit Session</p>
+
+                    {/* Expert Assignment */}
+                    <div>
+                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Assign Expert</label>
+                      <select
+                        value={consultationEdits.expertId}
+                        onChange={(e) => {
+                          const expert = users.find((u: any) => u.id === e.target.value);
+                          setConsultationEdits(prev => prev ? {
+                            ...prev,
+                            expertId: e.target.value,
+                            expertName: expert?.name || expert?.email || '',
+                          } : null);
+                        }}
+                        className="w-full h-10 px-3 bg-zinc-800 border border-white/10 rounded-sm text-sm text-white"
+                      >
+                        <option value="">Select an expert...</option>
+                        {users.filter((u: any) => u.role?.includes('expert')).map((u: any) => (
+                          <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Price */}
+                    <div>
+                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Session Price</label>
+                      <Input
+                        value={consultationEdits.expertPrice}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConsultationEdits(prev => prev ? { ...prev, expertPrice: e.target.value } : null)}
+                        placeholder="e.g. ₱500/hr"
+                        className="bg-zinc-800 border-white/10 text-white"
+                      />
+                    </div>
+
+                    {/* Schedule */}
+                    <div>
+                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Schedule / Slot</label>
+                      <Input
+                        value={consultationEdits.slot}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConsultationEdits(prev => prev ? { ...prev, slot: e.target.value } : null)}
+                        placeholder="e.g. 2026-04-20 2:00 PM"
+                        className="bg-zinc-800 border-white/10 text-white"
+                      />
+                    </div>
+
+                    <Button
+                      className="w-full bg-safety-orange hover:bg-safety-orange/80 uppercase font-black text-[10px]"
+                      onClick={saveConsultationEdits}
+                      disabled={savingConsultation}
+                    >
+                      {savingConsultation ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                  </div>
+                )}
+
+                {selectedConsultation.projectDescription && (
+                  <div>
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Project Description</p>
+                    <div className="p-4 bg-black/30 rounded-sm border border-white/5">
+                      <p className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap">{selectedConsultation.projectDescription}</p>
+                    </div>
+                  </div>
+                )}
+
+                {selectedConsultation.requiredSkills && (
+                  <div>
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Required Skills / Tools</p>
+                    <div className="p-4 bg-black/30 rounded-sm border border-white/5">
+                      <p className="text-xs text-zinc-300 leading-relaxed">{selectedConsultation.requiredSkills}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="pt-4 border-t border-white/5 flex gap-3">
+                  {selectedConsultation.status === 'pending' && (
+                    <>
+                      <Button className="flex-grow bg-green-600 hover:bg-green-700 uppercase font-black text-[10px]" onClick={() => updateConsultation(selectedConsultation.id, 'confirmed')}>Accept Session</Button>
+                      <Button className="flex-grow bg-red-600/80 hover:bg-red-600 uppercase font-black text-[10px]" onClick={() => updateConsultation(selectedConsultation.id, 'cancelled')}>Decline</Button>
+                    </>
+                  )}
+                  {selectedConsultation.status === 'confirmed' && (
+                    <>
+                      <Button className="flex-grow bg-green-600 hover:bg-green-700 uppercase font-black text-[10px]" onClick={() => updateConsultation(selectedConsultation.id, 'completed')}>
+                        <CheckCircle2 className="w-3 h-3 mr-1" /> Mark Complete
+                      </Button>
+                      <Button className="flex-grow bg-red-600/80 hover:bg-red-600 uppercase font-black text-[10px]" onClick={() => updateConsultation(selectedConsultation.id, 'cancelled')}>Cancel</Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Audit Logs Modal */}
       <AnimatePresence>
