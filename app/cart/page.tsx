@@ -574,7 +574,7 @@ export default function CartPage() {
 
           {/* ─── Order Summary Sidebar ─── */}
           <div className="space-y-6">
-            <div className="sticky top-32">
+            <div className="lg:sticky lg:top-32">
               <div className="p-8 bg-zinc-900 border border-white/5 rounded-sm shadow-2xl">
                 <h4 className="text-lg font-black text-white uppercase mb-8 tracking-tighter">Order Summary</h4>
                 <div className="space-y-4 mb-4">
