@@ -10,8 +10,10 @@ import { Input } from '@/components/ui/Input';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { MessageCircle, Send, ArrowLeft, Package, Activity, User as UserIcon, Trash2, ExternalLink } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
+import { Suspense } from 'react';
 
 interface Chat {
   id: string;
@@ -34,8 +36,10 @@ interface Message {
   createdAt: string;
 }
 
-export default function ChatPage() {
+function ChatPageInner() {
   const { data: session } = useSession();
+  const searchParams = useSearchParams();
+  const chatIdParam = searchParams.get('id');
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
@@ -51,6 +55,14 @@ export default function ChatPage() {
   useEffect(() => {
     fetchChats();
   }, []);
+
+  // Auto-open chat when ?id= param is present
+  useEffect(() => {
+    if (chatIdParam && chats.length > 0 && !selectedChat) {
+      const target = chats.find(c => c.id === chatIdParam);
+      if (target) openChat(target);
+    }
+  }, [chatIdParam, chats]);
 
   // Poll for new messages every 5 seconds when a chat is open
   useEffect(() => {
@@ -201,10 +213,10 @@ export default function ChatPage() {
 
   return (
     <PageShell>
-      <div className="container mx-auto px-4 py-16 sm:py-20">
+      <div className="container mx-auto px-4 pt-16 sm:pt-20 pb-4 flex flex-col h-[calc(100vh-64px)]">
         <SectionHeading title="Messages" annotation="Chat & Support" dark={true} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)] min-h-[500px]">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
           {/* Chat List — scrollable, contained */}
           <div className={`flex flex-col h-full overflow-hidden border border-[var(--border-primary)] rounded-sm bg-[var(--bg-secondary)] ${selectedChat ? 'hidden lg:flex' : ''}`}>
             <div className="p-3 border-b border-[var(--border-primary)] bg-[var(--bg-surface)]">
@@ -275,7 +287,7 @@ export default function ChatPage() {
           </div>
 
           {/* Chat Window */}
-          <div className="lg:col-span-2 h-full">
+          <div className="lg:col-span-2 h-full overflow-hidden">
             {selectedChat ? (
               <div className="flex flex-col h-full border border-[var(--border-primary)] rounded-sm overflow-hidden bg-[var(--bg-secondary)]">
                 {/* Chat Header */}
@@ -306,7 +318,7 @@ export default function ChatPage() {
                 </div>
 
                 {/* Messages */}
-                <div ref={messagesContainerRef} className="flex-grow flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+                <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
                   {loadingMessages ? (
                     <div className="py-10 flex justify-center"><Activity className="w-6 h-6 text-safety-orange animate-spin" /></div>
                   ) : messages.length > 0 ? (
@@ -388,5 +400,19 @@ export default function ChatPage() {
         onCancel={() => setDeleteConfirm({ open: false, chatId: null })}
       />
     </PageShell>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={
+      <PageShell>
+        <div className="container mx-auto px-4 py-20 flex items-center justify-center min-h-[50vh]">
+          <div className="font-mono text-safety-orange animate-pulse uppercase tracking-widest">Loading Messages...</div>
+        </div>
+      </PageShell>
+    }>
+      <ChatPageInner />
+    </Suspense>
   );
 }
