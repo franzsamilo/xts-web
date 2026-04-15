@@ -274,8 +274,8 @@ export default function CommunityPage() {
         )}
       </AnimatePresence>
 
-      <div className="container mx-auto px-6 py-20">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
+      <div className="container mx-auto px-4 sm:px-6 py-16 sm:py-20 overflow-x-hidden">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 sm:gap-8 mb-10 sm:mb-16">
           <SectionHeading title="The Feed" annotation="Engineering Community" dark={true} className="mb-0" />
           <Button onClick={() => setShowCreate(!showCreate)} className="whitespace-nowrap">
             {showCreate ? 'Close Editor' : 'Create Post'}
@@ -362,12 +362,12 @@ export default function CommunityPage() {
                             <div className="h-full w-px bg-zinc-200" />
                           </div>
                           <div className="flex-grow">
-                            <div className="flex items-center gap-3 mb-3">
+                            <div className="flex items-center gap-3 mb-3 min-w-0">
                               <Badge variant={post.tag === 'Announcement' ? 'new' : post.tag === 'Question' ? 'warning' : 'pending'}>{post.tag}</Badge>
-                              <span className="text-xs font-bold text-zinc-500 uppercase tracking-tighter">@{post.author} • {timeAgo(post.createdAt)}</span>
+                              <span className="text-xs font-bold text-zinc-500 uppercase tracking-tighter truncate">@{post.author} • {timeAgo(post.createdAt)}</span>
                             </div>
-                            <h3 className="text-2xl font-black text-esd-dark uppercase mb-4 group-hover:text-safety-orange transition-colors cursor-pointer">{post.title}</h3>
-                            <p className="text-zinc-600 mb-4 leading-relaxed whitespace-pre-wrap">{post.content}</p>
+                            <h3 className="text-2xl font-black text-esd-dark uppercase mb-4 group-hover:text-safety-orange transition-colors cursor-pointer break-words">{post.title}</h3>
+                            <p className="text-zinc-600 mb-4 leading-relaxed whitespace-pre-wrap break-words">{post.content}</p>
 
                             {/* Post Images */}
                             {post.imageUrls && post.imageUrls.length > 0 && (
@@ -506,7 +506,7 @@ export default function CommunityPage() {
                     <div key={user} className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-zinc-800 rounded-full flex items-center justify-center text-[10px] font-black text-white">{user[0]?.toUpperCase()}</div>
-                        <span className="text-sm font-bold text-zinc-400">@{user}</span>
+                        <span className="text-sm font-bold text-zinc-400 truncate">@{user}</span>
                       </div>
                       <Badge variant="new" className="text-[8px] px-1 pointer-events-none">{count} post{count !== 1 ? 's' : ''}</Badge>
                     </div>

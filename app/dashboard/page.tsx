@@ -116,15 +116,15 @@ export default function DashboardPage() {
     <PageShell>
       <div className="container mx-auto px-4 py-20">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-6 min-w-0">
             {session?.user?.image ? (
-              <img src={session.user.image} alt="Profile" className="w-14 h-14 sm:w-20 sm:h-20 rounded-sm border-2 border-safety-orange p-1 shadow-2xl" />
+              <img src={session.user.image} alt="Profile" className="w-14 h-14 sm:w-20 sm:h-20 rounded-sm border-2 border-safety-orange p-1 shadow-2xl shrink-0" />
             ) : (
-              <div className="w-14 h-14 sm:w-20 sm:h-20 bg-zinc-800 rounded-sm flex items-center justify-center border-2 border-safety-orange shadow-2xl">
+              <div className="w-14 h-14 sm:w-20 sm:h-20 bg-zinc-800 rounded-sm flex items-center justify-center border-2 border-safety-orange shadow-2xl shrink-0">
                 <UserIcon className="w-10 h-10 text-white opacity-20" />
               </div>
             )}
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2 mb-2">
                 <Badge>ID: #{session?.user?.email?.split('@')[0].toUpperCase().slice(0, 7) || 'ENG-9902'}</Badge>
                 <Badge variant="new" className="bg-safety-orange text-white">{userRole.toUpperCase()}</Badge>
@@ -132,7 +132,7 @@ export default function DashboardPage() {
               <h2 className="text-2xl sm:text-4xl md:text-5xl font-black text-white uppercase tracking-tighter leading-none">
                 {session?.user?.name || 'Engineer'}
               </h2>
-              <p className="font-handwriting text-safety-orange mt-1">Status: Operational // {session?.user?.email}</p>
+              <p className="font-handwriting text-safety-orange mt-1 break-all">Status: Operational // {session?.user?.email}</p>
             </div>
           </div>
           <div className="flex gap-4">
