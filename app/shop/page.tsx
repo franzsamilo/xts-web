@@ -20,16 +20,8 @@ export default function ShopPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
-  const [tappedId, setTappedId] = useState<string | null>(null);
   const [toastItem, setToastItem] = useState<{ name: string; imageUrl: string } | null>(null);
   const { addToCart } = useCart();
-
-  useEffect(() => {
-    if (!tappedId) return;
-    const dismiss = () => setTappedId(null);
-    window.addEventListener('scroll', dismiss);
-    return () => window.removeEventListener('scroll', dismiss);
-  }, [tappedId]);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -70,7 +62,6 @@ export default function ShopPage() {
       sellerId: product.sellerId || undefined,
     });
     setAddedIds(prev => new Set(prev).add(product.id));
-    setTappedId(null);
     setToastItem({ name: product.name, imageUrl: product.imageUrls?.[0] || '' });
     setTimeout(() => setToastItem(null), 2000);
     setTimeout(() => {
@@ -128,23 +119,8 @@ export default function ShopPage() {
             <AnimatePresence mode="popLayout">
               {filtered.map((product, i) => (
                 <motion.div key={product.id} layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, delay: i * 0.03 }} className="min-w-0">
-                  <div
-                    className="group relative h-full flex flex-col"
-                    onClick={() => {
-                      if (window.innerWidth < 640) {
-                        setTappedId(prev => prev === product.id ? null : product.id);
-                      }
-                    }}
-                  >
-                    <Link
-                      href={`/shop/${product.id}`}
-                      className="flex-grow min-w-0"
-                      onClick={(e) => {
-                        if (window.innerWidth < 640 && tappedId !== product.id) {
-                          e.preventDefault();
-                        }
-                      }}
-                    >
+                  <div className="group relative h-full flex flex-col">
+                    <Link href={`/shop/${product.id}`} className="flex-grow min-w-0">
                       <Card hoverEffect={false} className="transition-transform duration-200 sm:group-hover:scale-[1.02] sm:group-hover:-translate-y-1 h-full flex flex-col overflow-hidden">
                         {/* Image */}
                         <div className="aspect-square bg-[var(--bg-surface)] rounded-sm overflow-hidden mb-2 sm:mb-3 relative border border-[var(--border-secondary)] shrink-0">
@@ -187,51 +163,10 @@ export default function ShopPage() {
                             <span className="text-sm sm:text-lg font-black text-[var(--text-on-card)]">₱{Number(product.price).toLocaleString()}</span>
                           </div>
                         </div>
-
-                        {/* Mobile tap-to-reveal overlay */}
-                        <AnimatePresence>
-                          {tappedId === product.id && (
-                            <motion.div
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: 20 }}
-                              transition={{ duration: 0.18 }}
-                              className="sm:hidden absolute inset-x-0 bottom-0 rounded-b-sm overflow-hidden"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <div className="bg-gradient-to-t from-black/90 to-black/60 px-2 pt-6 pb-2 flex flex-col gap-1.5">
-                                <button
-                                  onClick={(e) => { e.preventDefault(); handleAddToCart(product); }}
-                                  disabled={product.stock <= 0}
-                                  className={`w-full py-2 rounded-sm text-[9px] font-black uppercase tracking-wider transition-all ${
-                                    addedIds.has(product.id)
-                                      ? 'bg-green-600 text-white'
-                                      : product.stock <= 0
-                                        ? 'bg-[var(--bg-surface)] text-[var(--text-muted)] cursor-not-allowed'
-                                        : 'bg-safety-orange text-white active:scale-95'
-                                  }`}
-                                >
-                                  {addedIds.has(product.id) ? (
-                                    <span className="flex items-center justify-center gap-1"><Check className="w-3 h-3" /> Added</span>
-                                  ) : product.stock <= 0 ? 'Out of Stock' : (
-                                    <span className="flex items-center justify-center gap-1"><ShoppingCart className="w-3 h-3" /> Add to Cart</span>
-                                  )}
-                                </button>
-                                <Link
-                                  href={`/shop/${product.id}`}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="w-full py-2 rounded-sm text-[9px] font-black uppercase tracking-wider text-center text-white border border-white/30 hover:bg-white/10 transition-all"
-                                >
-                                  View Details
-                                </Link>
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
                       </Card>
                     </Link>
-                    {/* Add to Cart Button — desktop only */}
-                    <div className="hidden sm:block mt-1.5 sm:mt-2 shrink-0">
+                    {/* Add to Cart Button — always visible on both mobile and desktop */}
+                    <div className="mt-1.5 sm:mt-2 shrink-0">
                       <button
                         onClick={(e) => { e.preventDefault(); handleAddToCart(product); }}
                         disabled={product.stock <= 0}
@@ -246,7 +181,7 @@ export default function ShopPage() {
                         {addedIds.has(product.id) ? (
                           <span className="flex items-center justify-center gap-1"><Check className="w-3 h-3" /> Added</span>
                         ) : product.stock <= 0 ? 'Out of Stock' : (
-                          <span className="flex items-center justify-center gap-1"><ShoppingCart className="w-3 h-3" /> Add</span>
+                          <span className="flex items-center justify-center gap-1"><ShoppingCart className="w-3 h-3" /> Add to Cart</span>
                         )}
                       </button>
                     </div>

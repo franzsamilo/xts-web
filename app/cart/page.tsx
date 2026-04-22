@@ -31,6 +31,7 @@ export default function CartPage() {
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [orderPlaced, setOrderPlaced] = useState<string | null>(null);
   const [pickupChatLoading, setPickupChatLoading] = useState(false);
+  const [pickupChatError, setPickupChatError] = useState<string | null>(null);
 
   // Delivery state — default to pickup while standard delivery is disabled
   const [deliveryMethod, setDeliveryMethod] = useState<'standard' | 'pickup' | null>(
@@ -70,6 +71,7 @@ export default function CartPage() {
   const handlePickupChat = async () => {
     if (!session || !selectedPickup) return;
     setPickupChatLoading(true);
+    setPickupChatError(null);
     try {
       // Route to the seller of the first item if available, otherwise admin inbox
       const firstSeller = items.find(i => i.sellerId)?.sellerId;
@@ -89,12 +91,19 @@ export default function CartPage() {
           },
         }),
       });
-      if (res.ok) {
-        const chat = await res.json();
-        router.push(`/chat?id=${chat.id}`);
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPickupChatError(payload.error || `Could not open chat (HTTP ${res.status})`);
+        return;
+      }
+      if (payload.id) {
+        router.push(`/chat?id=${payload.id}`);
+      } else {
+        setPickupChatError('Chat created but response was malformed. Check your inbox.');
       }
     } catch (e) {
       console.error('Failed to create pickup chat', e);
+      setPickupChatError('Network error while opening chat. Please try again.');
     } finally {
       setPickupChatLoading(false);
     }
@@ -482,6 +491,11 @@ export default function CartPage() {
                               <><MessageCircle className="w-4 h-4" /><span className="text-xs font-black uppercase tracking-widest">Chat about Pickup</span></>
                             )}
                           </button>
+                          {pickupChatError && (
+                            <div className="mt-2 p-2 bg-red-500/10 border border-red-500/30 rounded-sm">
+                              <p className="text-[10px] text-red-400 font-bold">{pickupChatError}</p>
+                            </div>
+                          )}
                           <p className="text-[9px] text-zinc-600 text-center mt-2">Coordinate pickup time and details with the seller</p>
                         </motion.div>
                       )}

@@ -98,18 +98,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(existingChat);
     }
 
-    const chat = await createChat({
+    const chatPayload: Omit<ChatData, 'id'> = {
       participants: [session.user.email, recipientId],
       participantNames: {
         [session.user.email]: session.user.name || 'User',
         [recipientId]: recipientName,
       },
-      productRef: body?.productRef || undefined,
-      pickupRef: body?.pickupRef || undefined,
       type,
       lastMessage: initialMessage,
       createdAt: new Date(),
-    });
+    };
+    if (body?.productRef && typeof body.productRef === 'object') {
+      chatPayload.productRef = body.productRef;
+    }
+    if (body?.pickupRef && typeof body.pickupRef === 'object') {
+      chatPayload.pickupRef = body.pickupRef;
+    }
+    const chat = await createChat(chatPayload);
 
     if (initialMessage && chat.id) {
       await addMessage(chat.id, {

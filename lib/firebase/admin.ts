@@ -20,6 +20,14 @@ if (!getApps().length) {
 }
 
 const adminDb = getFirestore(adminApp);
+// Firestore rejects undefined values by default. Opt-in to silently dropping
+// them so optional fields (productRef, pickupRef, pickupPointId, etc.) don't
+// blow up .add()/.set() calls when left off a payload. settings() must run
+// before the first read/write, and can only be called once per instance — the
+// try/catch keeps hot-reload re-imports from throwing.
+try {
+  adminDb.settings({ ignoreUndefinedProperties: true });
+} catch {}
 const adminStorage = getStorage(adminApp);
 
 export { adminApp, adminDb, adminStorage };

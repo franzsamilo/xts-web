@@ -22,6 +22,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [added, setAdded] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
   const [chatLoading, setChatLoading] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
   const { addToCart } = useCart();
 
   useEffect(() => {
@@ -73,6 +74,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       return;
     }
     setChatLoading(true);
+    setChatError(null);
     try {
       const productPrice = parseFloat(product.price).toLocaleString('en-PH', { minimumFractionDigits: 2 });
       const initialMessage = `Hi! I'm interested in this product:\n\n📦 ${product.name}\n🏷️ SKU: ${product.sku}\n💰 Price: ₱${productPrice}\n📂 Category: ${product.category}\n\nCould you help me with more details?`;
@@ -95,12 +97,19 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           initialMessage,
         }),
       });
-      if (res.ok) {
-        const chat = await res.json();
-        router.push(`/chat?id=${chat.id}`);
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setChatError(payload.error || `Could not start chat (HTTP ${res.status})`);
+        return;
+      }
+      if (payload.id) {
+        router.push(`/chat?id=${payload.id}`);
+      } else {
+        setChatError('Chat created but response was malformed. Check your inbox.');
       }
     } catch (e) {
       console.error('Failed to start chat', e);
+      setChatError('Network error while starting chat. Please try again.');
     } finally {
       setChatLoading(false);
     }
@@ -277,6 +286,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   <><MessageCircle className="w-4 h-4" /> Chat Seller about this Product</>
                 )}
               </Button>
+              {chatError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-sm">
+                  <p className="text-xs text-red-500 font-bold">{chatError}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

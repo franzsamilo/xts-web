@@ -353,7 +353,12 @@ export default function DashboardPage() {
                             <h4 className="text-lg font-black text-esd-dark uppercase">{c.expertName}</h4>
                             <p className="text-xs text-[var(--text-on-card-muted)]">{c.expertTitle}</p>
                           </div>
-                          <Badge variant={c.status === 'confirmed' ? 'completed' : 'pending'}>{(c.status || 'pending').toUpperCase()}</Badge>
+                          <Badge variant={
+                            c.status === 'completed' ? 'completed'
+                            : c.status === 'confirmed' ? 'confirmed'
+                            : c.status === 'cancelled' ? 'cancelled'
+                            : 'pending'
+                          }>{(c.status || 'pending').toUpperCase()}</Badge>
                         </div>
                         <div className="flex items-center gap-4 p-3 bg-zinc-100 rounded-sm">
                           <Activity className="w-4 h-4 text-safety-orange" />

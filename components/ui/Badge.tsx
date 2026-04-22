@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 
 interface BadgeProps {
   children: React.ReactNode;
-  variant?: 'pending' | 'in-progress' | 'completed' | 'new' | 'warning';
+  variant?: 'pending' | 'in-progress' | 'completed' | 'confirmed' | 'cancelled' | 'new' | 'warning';
   className?: string;
 }
 
@@ -11,7 +11,9 @@ export const Badge = ({ children, variant = 'new', className }: BadgeProps) => {
   const variants = {
     pending: 'bg-zinc-200 text-zinc-800',
     'in-progress': 'bg-blue-100 text-blue-800',
+    confirmed: 'bg-sky-100 text-sky-800',
     completed: 'bg-green-100 text-green-800',
+    cancelled: 'bg-red-100 text-red-800',
     new: 'bg-safety-orange text-white',
     warning: 'bg-red-100 text-red-800',
   };

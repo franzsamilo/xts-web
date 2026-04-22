@@ -917,7 +917,11 @@ function AdminPanel() {
             ) : consultations.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {consultations.map((consult: any) => {
-                    const statusVariant = consult.status === 'confirmed' ? 'completed' : consult.status === 'cancelled' ? 'warning' : consult.status === 'completed' ? 'completed' : 'pending';
+                    const statusVariant =
+                      consult.status === 'completed' ? 'completed'
+                      : consult.status === 'confirmed' ? 'confirmed'
+                      : consult.status === 'cancelled' ? 'cancelled'
+                      : 'pending';
                     return (
                     <Card key={consult.id} className="border border-white/5 bg-black/40">
                       <div className="flex justify-between items-start mb-4">
@@ -960,7 +964,7 @@ function AdminPanel() {
                             </>
                           )}
                           {(consult.status === 'completed' || consult.status === 'cancelled') && (
-                            <Badge variant={consult.status === 'completed' ? 'completed' : 'warning'} className="text-[8px] px-3 py-1">
+                            <Badge variant={consult.status === 'completed' ? 'completed' : 'cancelled'} className="text-[8px] px-3 py-1">
                               {consult.status.toUpperCase()}
                             </Badge>
                           )}
@@ -1007,7 +1011,12 @@ function AdminPanel() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Status</p>
-                    <Badge variant={selectedConsultation.status === 'confirmed' ? 'completed' : selectedConsultation.status === 'cancelled' ? 'warning' : selectedConsultation.status === 'completed' ? 'completed' : 'pending'} className="mt-1">
+                    <Badge variant={
+                      selectedConsultation.status === 'completed' ? 'completed'
+                      : selectedConsultation.status === 'confirmed' ? 'confirmed'
+                      : selectedConsultation.status === 'cancelled' ? 'cancelled'
+                      : 'pending'
+                    } className="mt-1">
                       {(selectedConsultation.status || 'pending').toUpperCase()}
                     </Badge>
                   </div>
