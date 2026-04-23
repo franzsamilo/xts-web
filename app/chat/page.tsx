@@ -250,9 +250,18 @@ function ChatPageInner() {
                           {chat.hasUnread && (
                             <span className="w-2.5 h-2.5 bg-safety-orange rounded-full shrink-0 animate-pulse" />
                           )}
-                          <Badge variant={chat.type === 'product' ? 'new' : chat.type === 'consultation' ? 'in-progress' : 'pending'} className="text-[7px] shrink-0">
-                            {chat.type}
-                          </Badge>
+                          <div className="flex flex-col items-end gap-1 shrink-0">
+                            <Badge variant={chat.type === 'product' ? 'new' : chat.type === 'consultation' ? 'in-progress' : 'pending'} className="text-[7px]">
+                              {chat.type}
+                            </Badge>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ open: true, chatId: chat.id }); }}
+                              className="p-1 rounded-sm text-[var(--text-muted)] hover:text-red-500 hover:bg-red-500/10 transition-all"
+                              title="Delete chat"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                         {chat.productRef && (
                           <div className="ml-12 flex items-center gap-2 mt-1 px-2 py-1 bg-[var(--bg-surface-elevated)] rounded-sm border border-[var(--border-secondary)]">
@@ -265,14 +274,6 @@ function ChatPageInner() {
                           </div>
                         )}
                       </div>
-                      {/* Delete button — always visible */}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ open: true, chatId: chat.id }); }}
-                        className="absolute top-3 right-2 p-1 rounded-sm text-[var(--text-muted)] hover:text-red-500 hover:bg-red-500/10 transition-all"
-                        title="Delete chat"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
                     </div>
                   ))}
                 </div>

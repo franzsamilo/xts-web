@@ -948,19 +948,19 @@ function AdminPanel() {
                         </div>
                       )}
 
-                      <div className="flex gap-3">
+                      <div className="flex flex-wrap gap-2">
                           {consult.status === 'pending' && (
                             <>
-                              <Button className="flex-grow bg-green-600 hover:bg-green-700 uppercase font-black text-[10px]" onClick={() => confirmSession(consult.id)}>Accept</Button>
-                              <Button className="flex-grow bg-red-600/80 hover:bg-red-600 uppercase font-black text-[10px]" onClick={() => updateConsultation(consult.id, 'cancelled')}>Decline</Button>
+                              <Button size="sm" className="flex-1 min-w-0 bg-green-600 hover:bg-green-700 uppercase font-black text-[10px]" onClick={() => confirmSession(consult.id)}>Accept</Button>
+                              <Button size="sm" className="flex-1 min-w-0 bg-red-600/80 hover:bg-red-600 uppercase font-black text-[10px]" onClick={() => updateConsultation(consult.id, 'cancelled')}>Decline</Button>
                             </>
                           )}
                           {consult.status === 'confirmed' && (
                             <>
-                              <Button className="flex-grow bg-green-600 hover:bg-green-700 uppercase font-black text-[10px]" onClick={() => updateConsultation(consult.id, 'completed')}>
+                              <Button size="sm" className="flex-1 min-w-0 bg-green-600 hover:bg-green-700 uppercase font-black text-[10px]" onClick={() => updateConsultation(consult.id, 'completed')}>
                                 <CheckCircle2 className="w-3 h-3 mr-1" /> Complete
                               </Button>
-                              <Button className="flex-grow bg-red-600/80 hover:bg-red-600 uppercase font-black text-[10px]" onClick={() => updateConsultation(consult.id, 'cancelled')}>Cancel</Button>
+                              <Button size="sm" className="flex-1 min-w-0 bg-red-600/80 hover:bg-red-600 uppercase font-black text-[10px]" onClick={() => updateConsultation(consult.id, 'cancelled')}>Cancel</Button>
                             </>
                           )}
                           {(consult.status === 'completed' || consult.status === 'cancelled') && (
@@ -968,7 +968,7 @@ function AdminPanel() {
                               {consult.status.toUpperCase()}
                             </Badge>
                           )}
-                          <Button variant="outline" className="flex-grow uppercase font-black text-[10px]" onClick={() => {
+                          <Button size="sm" variant="outline" className="flex-1 min-w-0 uppercase font-black text-[10px]" onClick={() => {
                             setSelectedConsultation(consult);
                             setConsultationEdits({
                               expertName: consult.expertName || '',

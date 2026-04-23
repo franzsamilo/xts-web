@@ -248,8 +248,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="mt-auto space-y-3">
+            {/* Action Buttons (hidden on mobile — sticky bottom bar replaces these) */}
+            <div className="mt-auto space-y-3 hidden sm:block">
               <div className="grid grid-cols-2 gap-3">
                 <Button
                   className={`h-12 sm:h-14 text-sm uppercase font-black tracking-wider transition-all w-full ${
@@ -286,12 +286,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   <><MessageCircle className="w-4 h-4" /> Chat Seller about this Product</>
                 )}
               </Button>
-              {chatError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-sm">
-                  <p className="text-xs text-red-500 font-bold">{chatError}</p>
-                </div>
-              )}
             </div>
+            {chatError && (
+              <div className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-sm">
+                <p className="text-xs text-red-500 font-bold">{chatError}</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
