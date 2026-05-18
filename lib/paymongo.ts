@@ -309,6 +309,39 @@ export async function capturePaymongoPaymentIntent(params: {
   };
 }
 
+/**
+ * PayMongo webhook signing (official): HMAC-SHA256(whsk_secret, `${t}.${rawBody}`) as hex,
+ * then compare to `te` (test) or `li` (live) from the Paymongo-Signature header.
+ * @see https://developers.paymongo.com/docs/creating-webhook
+ */
+function parsePaymongoSignatureHeader(header: string): {
+  t: string;
+  te: string;
+  li: string;
+} | null {
+  const parts: Record<string, string> = {};
+  for (const segment of header.split(',')) {
+    const i = segment.indexOf('=');
+    if (i === -1) continue;
+    const key = segment.slice(0, i).trim();
+    parts[key] = segment.slice(i + 1).trim();
+  }
+  const t = parts.t;
+  if (!t) return null;
+  return { t, te: parts.te ?? '', li: parts.li ?? '' };
+}
+
+function timingSafeHexEqual(aHex: string, bHex: string): boolean {
+  try {
+    const a = Buffer.from(aHex, 'hex');
+    const b = Buffer.from(bHex, 'hex');
+    if (a.length !== b.length || a.length === 0) return false;
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
 export function verifyPaymongoWebhookSignature(params: {
   body: string;
   signatureHeader: string | null;
@@ -318,23 +351,17 @@ export function verifyPaymongoWebhookSignature(params: {
   if (!secret) return false;
   if (!signatureHeader) return false;
 
-  const expected = createHmac('sha256', secret).update(body).digest('hex');
-  const headerValue = signatureHeader.trim();
+  const parsed = parsePaymongoSignatureHeader(signatureHeader.trim());
+  if (!parsed) return false;
 
-  const actualHex = headerValue.includes('=')
-    ? headerValue
-        .split(',')
-        .map((part) => part.trim())
-        .find((part) => part.startsWith('v1='))
-        ?.slice(3) || ''
-    : headerValue;
+  const signedPayload = `${parsed.t}.${body}`;
+  const expectedHex = createHmac('sha256', secret).update(signedPayload).digest('hex');
 
-  if (!actualHex) return false;
-
-  const expectedBuf = Buffer.from(expected, 'hex');
-  const actualBuf = Buffer.from(actualHex, 'hex');
-  if (expectedBuf.length !== actualBuf.length) return false;
-  return timingSafeEqual(expectedBuf, actualBuf);
+  // Legitimate events include only one of te / li (test vs live).
+  return (
+    (parsed.te.length > 0 && timingSafeHexEqual(expectedHex, parsed.te)) ||
+    (parsed.li.length > 0 && timingSafeHexEqual(expectedHex, parsed.li))
+  );
 }
 
 export async function createPaymongoPayout(params: {

@@ -36,6 +36,7 @@ function isFailedPaymentStatus(status: string | undefined): boolean {
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
+    // Header name is case-insensitive; PayMongo docs use Paymongo-Signature.
     const signatureHeader = req.headers.get('paymongo-signature');
     const isValid = verifyPaymongoWebhookSignature({
       body: rawBody,
