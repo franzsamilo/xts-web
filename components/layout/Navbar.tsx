@@ -36,7 +36,9 @@ export const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Poll for unread chats
+  // Poll for unread chats. Also listens for an in-page "chats:refresh-unread"
+  // event so the badge clears immediately after a user reads or sends a
+  // message, instead of waiting up to 30 s for the next poll.
   useEffect(() => {
     if (!session) return;
     const fetchUnread = () => {
@@ -47,7 +49,12 @@ export const Navbar = () => {
     };
     fetchUnread();
     const interval = setInterval(fetchUnread, 30000);
-    return () => clearInterval(interval);
+    const onRefresh = () => fetchUnread();
+    window.addEventListener('chats:refresh-unread', onRefresh);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('chats:refresh-unread', onRefresh);
+    };
   }, [session]);
 
   const handleSignOut = async () => {

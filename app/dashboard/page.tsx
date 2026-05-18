@@ -7,11 +7,10 @@ import { PageShell } from '@/components/layout/PageShell';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { ServiceQueue } from '@/components/fabrication/ServiceQueue';
-import { Package, Settings, PenTool, LayoutDashboard, History, MessageCircle, User as UserIcon, ShoppingBag, LogOut, Mail, Shield, Activity, Truck, MapPin, Banknote, CreditCard, Send } from 'lucide-react';
+import { Package, Settings, PenTool, LayoutDashboard, History, MessageCircle, User as UserIcon, ShoppingBag, LogOut, Mail, Shield, Activity, Truck, MapPin, Banknote, CreditCard, ChevronDown, ChevronUp } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 
 export default function DashboardPage() {
@@ -23,12 +22,9 @@ export default function DashboardPage() {
   const [loadingData, setLoadingData] = useState(true);
   const [payBusyId, setPayBusyId] = useState<string | null>(null);
   const [payError, setPayError] = useState<string | null>(null);
-  const [selectedConsultChat, setSelectedConsultChat] = useState<string | null>(null);
-  const [consultMessages, setConsultMessages] = useState<any[]>([]);
-  const [loadingConsultMsgs, setLoadingConsultMsgs] = useState(false);
-  const [newConsultMsg, setNewConsultMsg] = useState('');
-  const [sendingConsultMsg, setSendingConsultMsg] = useState(false);
-  const consultMsgsRef = React.useRef<HTMLDivElement>(null);
+  // Tracks which order cards have their items dropdown expanded so the cards
+  // stay uniform in height by default.
+  const [expandedOrderItems, setExpandedOrderItems] = useState<Record<string, boolean>>({});
 
   const resumeGcashPayment = async (orderId: string) => {
     setPayBusyId(orderId);
@@ -50,47 +46,8 @@ export default function DashboardPage() {
     }
   };
 
-  const openConsultChat = async (consultationId: string) => {
-    setSelectedConsultChat(consultationId);
-    setLoadingConsultMsgs(true);
-    try {
-      const res = await fetch(`/api/consultations/${consultationId}/messages`);
-      if (res.ok) {
-        const msgs = await res.json();
-        setConsultMessages(msgs);
-        setTimeout(() => {
-          if (consultMsgsRef.current) consultMsgsRef.current.scrollTop = consultMsgsRef.current.scrollHeight;
-        }, 100);
-      }
-    } catch (e) {
-      console.error('Failed to fetch consultation messages', e);
-    } finally {
-      setLoadingConsultMsgs(false);
-    }
-  };
-
-  const sendConsultMsg = async () => {
-    if (!newConsultMsg.trim() || !selectedConsultChat) return;
-    setSendingConsultMsg(true);
-    try {
-      const res = await fetch(`/api/consultations/${selectedConsultChat}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: newConsultMsg.trim() }),
-      });
-      if (res.ok) {
-        const msg = await res.json();
-        setConsultMessages(prev => [...prev, { ...msg, createdAt: new Date().toISOString() }]);
-        setNewConsultMsg('');
-        setTimeout(() => {
-          if (consultMsgsRef.current) consultMsgsRef.current.scrollTop = consultMsgsRef.current.scrollHeight;
-        }, 100);
-      }
-    } catch (e) {
-      console.error('Failed to send message', e);
-    } finally {
-      setSendingConsultMsg(false);
-    }
+  const toggleOrderItems = (orderId: string) => {
+    setExpandedOrderItems(prev => ({ ...prev, [orderId]: !prev[orderId] }));
   };
 
   useEffect(() => {
@@ -231,37 +188,15 @@ export default function DashboardPage() {
                   <div className="space-y-4">
                     {userOrders.length > 0 ? (
                       userOrders.slice(0, 5).map(order => (
-                        <Card key={order.id} className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                          <div>
-                            <span className="text-xs font-black text-[var(--text-on-card-muted)] uppercase tracking-widest">{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'Recent'}</span>
-                            <h4 className="text-xl font-bold text-esd-dark mt-1">#{order.id?.slice(0, 8).toUpperCase()}</h4>
-                            <p className="text-[var(--text-on-card-secondary)] text-sm">{(order.items || []).map((i: any) => i.name).join(', ')}</p>
-                            {order.deliveryMethod && (
-                              <div className="flex items-center gap-1.5 mt-1">
-                                {order.deliveryMethod === 'pickup' ? (
-                                  <><MapPin className="w-3 h-3 text-blue-500" /><span className="text-[10px] text-blue-400 font-bold uppercase">Pickup: {order.pickupPointName || 'Local'}</span></>
-                                ) : (
-                                  <><Truck className="w-3 h-3 text-safety-orange" /><span className="text-[10px] text-zinc-500 font-bold uppercase">Standard Delivery</span></>
-                                )}
-                              </div>
-                            )}
-                            {order.paymentMethod && (
-                              <div className="flex items-center gap-1.5 mt-1">
-                                {order.paymentMethod === 'gcash' ? (
-                                  <><CreditCard className="w-3 h-3 text-blue-400" /><span className="text-[10px] text-blue-400 font-bold uppercase">GCash</span></>
-                                ) : (
-                                  <><Banknote className="w-3 h-3 text-green-500" /><span className="text-[10px] text-green-400 font-bold uppercase">COD</span></>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-8">
-                             <div className="text-right">
-                               <p className="text-xl font-black text-esd-dark">PHP {(order.total || 0).toFixed(2)}</p>
-                               <Badge variant={order.status === 'delivered' ? 'completed' : order.status === 'shipped' ? 'in-progress' : 'pending'}>{(order.status || 'processing').toUpperCase()}</Badge>
-                             </div>
-                          </div>
-                        </Card>
+                        <OrderCard
+                          key={order.id}
+                          order={order}
+                          expanded={!!expandedOrderItems[order.id]}
+                          onToggleItems={() => toggleOrderItems(order.id)}
+                          payBusyId={payBusyId}
+                          payError={payError}
+                          onResumePayment={resumeGcashPayment}
+                        />
                       ))
                     ) : (
                       <div className="py-12 border-2 border-dashed border-white/5 rounded-sm flex flex-col items-center justify-center text-center">
@@ -284,50 +219,15 @@ export default function DashboardPage() {
                 ) : userOrders.length > 0 ? (
                   <div className="space-y-4">
                     {userOrders.map(order => (
-                      <Card key={order.id} className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                        <div>
-                          <span className="text-xs font-black text-[var(--text-on-card-muted)] uppercase tracking-widest">{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'Recent'}</span>
-                          <h4 className="text-xl font-bold text-esd-dark mt-1">#{order.id?.slice(0, 8).toUpperCase()}</h4>
-                          <div className="mt-2 space-y-1">
-                            {(order.items || []).map((item: any, i: number) => (
-                              <p key={i} className="text-xs text-[var(--text-on-card-muted)]">{item.name} x{item.quantity} — PHP {(item.price * item.quantity).toFixed(2)}</p>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xl font-black text-esd-dark">PHP {(order.total || 0).toFixed(2)}</p>
-                          <Badge variant={order.status === 'delivered' ? 'completed' : order.status === 'shipped' ? 'in-progress' : 'pending'}>{(order.status || 'processing').toUpperCase()}</Badge>
-                          {order.paymentMethod && (
-                            <div className="flex items-center gap-1 mt-1 justify-end">
-                              {order.paymentMethod === 'gcash' ? (
-                                <><CreditCard className="w-3 h-3 text-blue-400" /><span className="text-[10px] text-blue-400 font-bold uppercase">GCash</span></>
-                              ) : (
-                                <><Banknote className="w-3 h-3 text-green-500" /><span className="text-[10px] text-green-400 font-bold uppercase">COD</span></>
-                              )}
-                            </div>
-                          )}
-                          {order.paymentStatus === 'awaiting_gateway' && order.paymentMethod === 'gcash' && (
-                            <p className="text-[10px] text-amber-400 font-bold mt-1">Awaiting GCash payment</p>
-                          )}
-                          {order.paymentStatus === 'awaiting_gateway' && order.paymentMethod === 'gcash' && order.id && (
-                            <>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="mt-2"
-                                disabled={payBusyId === order.id}
-                                onClick={() => resumeGcashPayment(order.id)}
-                              >
-                                {payBusyId === order.id ? 'Opening…' : 'Complete GCash payment'}
-                              </Button>
-                              {payError && payBusyId === null && (
-                                <p className="text-[10px] text-red-400 font-bold mt-2 max-w-[18rem]">{payError}</p>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </Card>
+                      <OrderCard
+                        key={order.id}
+                        order={order}
+                        expanded={!!expandedOrderItems[order.id]}
+                        onToggleItems={() => toggleOrderItems(order.id)}
+                        payBusyId={payBusyId}
+                        payError={payError}
+                        onResumePayment={resumeGcashPayment}
+                      />
                     ))}
                   </div>
                 ) : (
@@ -365,55 +265,19 @@ export default function DashboardPage() {
                           <span className="text-xs font-mono text-[var(--text-on-card-secondary)]">{c.slot || 'TBD'} — {c.expertPrice}</span>
                         </div>
 
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="mt-3 w-full text-[10px] uppercase font-black"
-                          onClick={() => selectedConsultChat === c.id ? setSelectedConsultChat(null) : openConsultChat(c.id)}
+                        <Link
+                          href={`/chat?tab=consultations&id=${c.id}&source=consultation`}
+                          className="mt-3 w-full block"
                         >
-                          <MessageCircle className="w-3 h-3 mr-1" />
-                          {selectedConsultChat === c.id ? 'Close Chat' : 'Chat with Expert'}
-                        </Button>
-
-                        {selectedConsultChat === c.id && (
-                          <div className="mt-3 border border-[var(--border-primary)] rounded-sm overflow-hidden">
-                            <div ref={consultMsgsRef} className="h-40 overflow-y-auto p-3 space-y-2 bg-[var(--bg-surface)]">
-                              {loadingConsultMsgs ? (
-                                <div className="flex justify-center py-4"><Activity className="w-5 h-5 text-safety-orange animate-spin" /></div>
-                              ) : consultMessages.length > 0 ? (
-                                consultMessages.map((msg: any) => {
-                                  const isMe = msg.senderId === session?.user?.email;
-                                  return (
-                                    <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                      <div className={`max-w-[80%] px-3 py-2 rounded-sm ${
-                                        isMe ? 'bg-safety-orange text-white' : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-primary)]'
-                                      }`}>
-                                        <p className="text-xs">{msg.content}</p>
-                                        <p className={`text-[9px] mt-1 ${isMe ? 'text-white/50' : 'text-[var(--text-muted)]'}`}>
-                                          {msg.senderName} · {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  );
-                                })
-                              ) : (
-                                <p className="text-center text-[10px] text-[var(--text-muted)] py-4">No messages yet.</p>
-                              )}
-                            </div>
-                            <div className="p-2 border-t border-[var(--border-primary)] flex gap-2 bg-[var(--bg-surface)]">
-                              <Input
-                                placeholder="Type a message..."
-                                value={newConsultMsg}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewConsultMsg(e.target.value)}
-                                onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendConsultMsg(); } }}
-                                className="flex-grow h-8 text-xs"
-                              />
-                              <Button size="sm" className="px-3 h-8" onClick={sendConsultMsg} disabled={!newConsultMsg.trim() || sendingConsultMsg}>
-                                <Send className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full text-[10px] uppercase font-black"
+                          >
+                            <MessageCircle className="w-3 h-3 mr-1" />
+                            Chat with Expert
+                          </Button>
+                        </Link>
                       </Card>
                     ))}
                   </div>
@@ -553,3 +417,100 @@ const StatCard = ({ label, value, sub }: { label: string, value: string, sub: st
      <p className="text-xs font-handwriting text-safety-orange opacity-80">{sub}</p>
   </div>
 );
+
+interface OrderCardProps {
+  order: any;
+  expanded: boolean;
+  onToggleItems: () => void;
+  payBusyId: string | null;
+  payError: string | null;
+  onResumePayment: (orderId: string) => void;
+}
+
+// Uniform-height order card. The items list is hidden behind a dropdown so a
+// 1-item order takes the same vertical space as a 10-item order. Without this
+// the cards in the orders list look ragged because each grows with item count.
+const OrderCard = ({ order, expanded, onToggleItems, payBusyId, payError, onResumePayment }: OrderCardProps) => {
+  const items = order.items || [];
+  const itemCount = items.reduce((sum: number, it: any) => sum + (it.quantity || 1), 0);
+  return (
+    <Card className="flex flex-col gap-4">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        <div className="min-w-0 flex-grow">
+          <span className="text-xs font-black text-[var(--text-on-card-muted)] uppercase tracking-widest">
+            {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'Recent'}
+          </span>
+          <h4 className="text-xl font-bold text-esd-dark mt-1">#{order.id?.slice(0, 8).toUpperCase()}</h4>
+          <div className="flex flex-wrap items-center gap-3 mt-2">
+            {order.deliveryMethod && (
+              <div className="flex items-center gap-1.5">
+                {order.deliveryMethod === 'pickup' ? (
+                  <><MapPin className="w-3 h-3 text-blue-500" /><span className="text-[10px] text-blue-400 font-bold uppercase">Pickup: {order.pickupPointName || 'Local'}</span></>
+                ) : (
+                  <><Truck className="w-3 h-3 text-safety-orange" /><span className="text-[10px] text-[var(--text-on-card-muted)] font-bold uppercase">Standard Delivery</span></>
+                )}
+              </div>
+            )}
+            {order.paymentMethod && (
+              <div className="flex items-center gap-1.5">
+                {order.paymentMethod === 'gcash' ? (
+                  <><CreditCard className="w-3 h-3 text-blue-400" /><span className="text-[10px] text-blue-400 font-bold uppercase">GCash</span></>
+                ) : (
+                  <><Banknote className="w-3 h-3 text-green-500" /><span className="text-[10px] text-green-500 font-bold uppercase">COD</span></>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <p className="text-xl font-black text-esd-dark">PHP {(order.total || 0).toFixed(2)}</p>
+          <Badge variant={order.status === 'delivered' ? 'completed' : order.status === 'shipped' ? 'in-progress' : 'pending'}>{(order.status || 'processing').toUpperCase()}</Badge>
+          {order.paymentStatus === 'awaiting_gateway' && order.paymentMethod === 'gcash' && (
+            <p className="text-[10px] text-amber-400 font-bold mt-1">Awaiting GCash payment</p>
+          )}
+          {order.paymentStatus === 'awaiting_gateway' && order.paymentMethod === 'gcash' && order.id && (
+            <>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-2"
+                disabled={payBusyId === order.id}
+                onClick={() => onResumePayment(order.id)}
+              >
+                {payBusyId === order.id ? 'Opening…' : 'Complete GCash payment'}
+              </Button>
+              {payError && payBusyId === null && (
+                <p className="text-[10px] text-red-400 font-bold mt-2 max-w-[18rem]">{payError}</p>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="border-t border-[var(--border-secondary)] pt-3">
+        <button
+          type="button"
+          onClick={onToggleItems}
+          className="w-full flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-[var(--text-on-card-muted)] hover:text-esd-dark transition-colors"
+          aria-expanded={expanded}
+        >
+          <span>
+            {items.length} {items.length === 1 ? 'item' : 'item types'} · {itemCount} unit{itemCount === 1 ? '' : 's'}
+          </span>
+          {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        </button>
+        {expanded && (
+          <ul className="mt-3 space-y-1.5">
+            {items.map((item: any, i: number) => (
+              <li key={i} className="flex items-center justify-between text-xs text-[var(--text-on-card-secondary)]">
+                <span className="truncate pr-2">{item.name} <span className="text-[var(--text-on-card-muted)]">×{item.quantity}</span></span>
+                <span className="font-mono text-[var(--text-on-card-muted)] shrink-0">PHP {(item.price * item.quantity).toFixed(2)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Card>
+  );
+};

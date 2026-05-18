@@ -20,7 +20,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const messages = await getMessages(id);
 
-    markChatAsRead(id, session.user.email).catch(() => {});
+    // Await so the navbar's unread count reflects the read state on the next
+    // poll instead of racing against the fire-and-forget write.
+    try {
+      await markChatAsRead(id, session.user.email);
+    } catch {}
 
     return NextResponse.json(messages);
   } catch (error) {

@@ -26,11 +26,12 @@ export async function GET() {
 
   try {
     const role = (session.user as any)?.role || '';
+    const email = session.user?.email || '';
     if (isAdmin(role) || isExpert(role)) {
-      const consultations = await getAllConsultations();
+      const consultations = await getAllConsultations(email);
       return NextResponse.json(consultations);
     } else {
-      const consultations = await getConsultationsByUser(session.user?.email || '');
+      const consultations = await getConsultationsByUser(email);
       return NextResponse.json(consultations);
     }
   } catch (error) {

@@ -15,21 +15,41 @@ export interface ConsultationData {
   projectDescription?: string;
   /** Tools/skills the customer thinks the engagement needs. */
   requiredSkills?: string;
+  lastMessage?: string;
+  lastMessageAt?: Date | any;
+  /** email -> ISO timestamp; mirrors the chat unread-tracking model. */
+  lastReadBy?: Record<string, string>;
+  hasUnread?: boolean;
   createdAt: Date | any;
 }
 
-export async function getAllConsultations(): Promise<ConsultationData[]> {
+function mapConsultationDoc(doc: FirebaseFirestore.QueryDocumentSnapshot, viewerEmail?: string): ConsultationData {
+  const data = doc.data();
+  const lastMessageAt = data.lastMessageAt?.toDate?.()?.toISOString?.() || null;
+  const lastReadBy = data.lastReadBy || {};
+  let hasUnread = false;
+  if (data.lastMessage && lastMessageAt && viewerEmail) {
+    const viewerLastRead = lastReadBy[viewerEmail];
+    hasUnread = !viewerLastRead || new Date(lastMessageAt) > new Date(viewerLastRead);
+  }
+  return {
+    id: doc.id,
+    ...data,
+    createdAt: data.createdAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
+    lastMessageAt: lastMessageAt || undefined,
+    lastReadBy,
+    hasUnread,
+  } as ConsultationData;
+}
+
+export async function getAllConsultations(viewerEmail?: string): Promise<ConsultationData[]> {
   try {
     const snapshot = await adminDb
       .collection('consultations')
       .orderBy('createdAt', 'desc')
       .get();
 
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
-    })) as ConsultationData[];
+    return snapshot.docs.map(doc => mapConsultationDoc(doc, viewerEmail));
   } catch (error) {
     console.error('Error fetching consultations:', error);
     return [];
@@ -44,11 +64,7 @@ export async function getConsultationsByUser(email: string): Promise<Consultatio
       .orderBy('createdAt', 'desc')
       .get();
 
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
-    })) as ConsultationData[];
+    return snapshot.docs.map(doc => mapConsultationDoc(doc, email));
   } catch (error) {
     console.error('Error fetching user consultations:', error);
     return [];
@@ -139,10 +155,21 @@ export async function addConsultationMessage(
       createdAt: new Date(),
     });
 
+  const now = new Date();
   await adminDb.collection('consultations').doc(consultationId).update({
     lastMessage: message.content,
-    lastMessageAt: new Date(),
+    lastMessageAt: now,
+    // Sender's own read state catches up so they don't see an unread dot on a
+    // message they just sent themselves.
+    [`lastReadBy.${message.senderId}`]: now.toISOString(),
   });
 
   return { id: docRef.id, ...message };
+}
+
+export async function markConsultationAsRead(consultationId: string, userId: string): Promise<void> {
+  const now = new Date().toISOString();
+  await adminDb.collection('consultations').doc(consultationId).update({
+    [`lastReadBy.${userId}`]: now,
+  });
 }

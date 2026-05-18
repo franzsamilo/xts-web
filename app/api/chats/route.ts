@@ -3,8 +3,9 @@ import { getChatsByUser, createChat, findExistingChat, addMessage, getUnreadChat
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { ADMIN_INBOX_EMAIL } from '@/lib/admin-email';
-import { isAdmin, isSeller } from '@/lib/roles';
+import { isAdmin, isExpert, isSeller } from '@/lib/roles';
 import { getUserByEmail } from '@/lib/users';
+import { getAllConsultations, getConsultationsByUser } from '@/lib/consultations';
 
 const VALID_CHAT_TYPES: ChatData['type'][] = ['product', 'consultation', 'support', 'pickup'];
 const MAX_MESSAGE_LEN = 2000;
@@ -18,8 +19,17 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     if (searchParams.get('unreadCount') === 'true') {
-      const count = await getUnreadChatCount(session.user.email);
-      return NextResponse.json({ count });
+      // Navbar badge counts both chats and consultations so a single dot
+      // reflects "any unread conversation" the user has across both surfaces.
+      const role = (session.user as any)?.role || '';
+      const [chatCount, consultations] = await Promise.all([
+        getUnreadChatCount(session.user.email),
+        (isAdmin(role) || isExpert(role))
+          ? getAllConsultations(session.user.email)
+          : getConsultationsByUser(session.user.email),
+      ]);
+      const consultationUnread = consultations.filter((c) => c.hasUnread).length;
+      return NextResponse.json({ count: chatCount + consultationUnread });
     }
 
     let chats = await getChatsByUser(session.user.email);

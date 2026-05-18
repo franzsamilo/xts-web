@@ -117,10 +117,14 @@ export async function addMessage(chatId: string, message: Omit<ChatMessage, 'id'
       createdAt: new Date(),
     });
 
-  // Update last message on chat
+  const now = new Date();
+  // Mark sender as having read their own message so the unread indicator does
+  // not light up for them after sending. Otherwise lastReadBy[sender] would
+  // lag behind lastMessageAt and hasUnread would compute true for the sender.
   await adminDb.collection('chats').doc(chatId).update({
     lastMessage: message.content,
-    lastMessageAt: new Date(),
+    lastMessageAt: now,
+    [`lastReadBy.${message.senderId}`]: now.toISOString(),
   });
 
   return { id: docRef.id, ...message };

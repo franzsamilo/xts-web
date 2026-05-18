@@ -66,6 +66,67 @@ export async function getAllOrders(): Promise<OrderData[]> {
   }
 }
 
+export interface PaginatedOrders {
+  orders: OrderData[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+/**
+ * Server-side paginated, time-windowed admin query. Keeps the dashboard
+ * responsive even as the orders collection grows.
+ *
+ * @param sinceMs Milliseconds in the past to include (e.g. 2 days = 172_800_000)
+ * @param page    1-indexed page number
+ * @param pageSize Items per page
+ */
+export async function getOrdersWithin(
+  sinceMs: number,
+  page: number,
+  pageSize: number
+): Promise<PaginatedOrders> {
+  try {
+    const cutoff = new Date(Date.now() - sinceMs);
+    const safePage = Math.max(1, Math.floor(page));
+    const safePageSize = Math.max(1, Math.min(100, Math.floor(pageSize)));
+
+    // Filter by createdAt server-side, then offset+limit. Firestore cursors
+    // are more efficient at scale but offset/limit is acceptable for the
+    // <100/page admin view — and trivially supports page jumps in the UI.
+    const baseQuery = adminDb
+      .collection('orders')
+      .where('createdAt', '>=', cutoff)
+      .orderBy('createdAt', 'desc');
+
+    const countSnap = await baseQuery.count().get();
+    const total = countSnap.data().count;
+
+    const snapshot = await baseQuery
+      .offset((safePage - 1) * safePageSize)
+      .limit(safePageSize)
+      .get();
+
+    const orders = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
+    })) as OrderData[];
+
+    return {
+      orders,
+      total,
+      page: safePage,
+      pageSize: safePageSize,
+      totalPages: Math.max(1, Math.ceil(total / safePageSize)),
+    };
+  } catch (error) {
+    console.error('Error fetching paginated orders:', error);
+    return { orders: [], total: 0, page, pageSize, totalPages: 0 };
+  }
+}
+
 export async function getOrdersByUser(email: string): Promise<OrderData[]> {
   try {
     const snapshot = await adminDb

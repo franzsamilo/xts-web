@@ -35,6 +35,13 @@ function AdminPanel() {
 
   const [orders, setOrders] = React.useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = React.useState(true);
+  // Server-side pagination state for the transaction registry. The registry
+  // only shows the last 2 days of orders to keep the view scalable.
+  const ORDERS_PAGE_SIZE = 10;
+  const ORDERS_WINDOW_DAYS = 2;
+  const [ordersPage, setOrdersPage] = React.useState(1);
+  const [ordersTotal, setOrdersTotal] = React.useState(0);
+  const [ordersTotalPages, setOrdersTotalPages] = React.useState(1);
 
   const [consultations, setConsultations] = React.useState<any[]>([]);
   const [loadingConsultations, setLoadingConsultations] = React.useState(true);
@@ -102,7 +109,7 @@ function AdminPanel() {
           fetch('/api/products'),
           fetch('/api/applications'),
           fetch('/api/consultations'),
-          fetch('/api/orders'),
+          fetch(`/api/orders?paginated=1&days=${ORDERS_WINDOW_DAYS}&page=1&pageSize=${ORDERS_PAGE_SIZE}`),
           fetch('/api/fabrication'),
           fetch('/api/pickup-points'),
         ]);
@@ -111,7 +118,13 @@ function AdminPanel() {
         if (prodRes.ok) setInventory(await prodRes.json());
         if (appRes.ok) setApplications(await appRes.json());
         if (consultRes.ok) setConsultations(await consultRes.json());
-        if (orderRes.ok) setOrders(await orderRes.json());
+        if (orderRes.ok) {
+          const data = await orderRes.json();
+          setOrders(data.orders || []);
+          setOrdersTotal(data.total || 0);
+          setOrdersTotalPages(data.totalPages || 1);
+          setOrdersPage(data.page || 1);
+        }
         if (fabRes.ok) setFabJobs(await fabRes.json());
         if (pickupRes.ok) setPickupPoints(await pickupRes.json());
         
@@ -132,6 +145,24 @@ function AdminPanel() {
       fetchData();
     }
   }, [status]);
+
+  const fetchOrdersPage = React.useCallback(async (page: number) => {
+    setLoadingOrders(true);
+    try {
+      const res = await fetch(`/api/orders?paginated=1&days=${ORDERS_WINDOW_DAYS}&page=${page}&pageSize=${ORDERS_PAGE_SIZE}`);
+      if (res.ok) {
+        const data = await res.json();
+        setOrders(data.orders || []);
+        setOrdersTotal(data.total || 0);
+        setOrdersTotalPages(data.totalPages || 1);
+        setOrdersPage(data.page || 1);
+      }
+    } catch (e) {
+      console.error('Failed to fetch orders page', e);
+    } finally {
+      setLoadingOrders(false);
+    }
+  }, []);
 
   // Actions
   const approveExpert = async (id: string) => {
@@ -515,9 +546,20 @@ function AdminPanel() {
             <>
               {/* Orders Management */}
               <TabsContent value="orders" className="space-y-8 mt-0">
-                <div className="mb-10">
-                   <h3 className="text-2xl font-black uppercase text-white tracking-tighter">Transaction Registry</h3>
-                   <p className="text-zinc-500 text-xs font-medium uppercase tracking-widest mt-1">Confirmed Procurement History</p>
+                <div className="mb-10 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+                   <div>
+                     <h3 className="text-2xl font-black uppercase text-white tracking-tighter">Transaction Registry</h3>
+                     <p className="text-zinc-500 text-xs font-medium uppercase tracking-widest mt-1">
+                       Confirmed Procurement History — Last {ORDERS_WINDOW_DAYS} Days
+                     </p>
+                   </div>
+                   <div className="text-xs font-mono text-zinc-500 uppercase tracking-widest">
+                     {ordersTotal > 0 ? (
+                       <>Showing <span className="text-white font-bold">{Math.min((ordersPage - 1) * ORDERS_PAGE_SIZE + 1, ordersTotal)}</span>–<span className="text-white font-bold">{Math.min(ordersPage * ORDERS_PAGE_SIZE, ordersTotal)}</span> of <span className="text-safety-orange font-black">{ordersTotal}</span></>
+                     ) : (
+                       <>0 records</>
+                     )}
+                   </div>
                 </div>
 
                 {loadingOrders ? (
@@ -590,11 +632,37 @@ function AdminPanel() {
                      </table>
                   </div>
                 ) : (
-                  <EmptyTerminalState 
-                    icon={Activity} 
-                    title="No Transactions" 
-                    description="The procurement registry is currently empty." 
+                  <EmptyTerminalState
+                    icon={Activity}
+                    title="No Transactions"
+                    description={`No procurements in the last ${ORDERS_WINDOW_DAYS} days.`}
                   />
+                )}
+
+                {ordersTotalPages > 1 && (
+                  <div className="flex items-center justify-between gap-3 pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={ordersPage <= 1 || loadingOrders}
+                      onClick={() => fetchOrdersPage(ordersPage - 1)}
+                      className="text-[10px] uppercase font-black"
+                    >
+                      Prev
+                    </Button>
+                    <div className="flex items-center gap-2 text-xs font-mono text-zinc-500">
+                      Page <span className="text-white font-bold">{ordersPage}</span> of <span className="text-white font-bold">{ordersTotalPages}</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={ordersPage >= ordersTotalPages || loadingOrders}
+                      onClick={() => fetchOrdersPage(ordersPage + 1)}
+                      className="text-[10px] uppercase font-black"
+                    >
+                      Next
+                    </Button>
+                  </div>
                 )}
               </TabsContent>
 

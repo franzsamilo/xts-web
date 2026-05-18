@@ -1,22 +1,25 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { PageShell } from '@/components/layout/PageShell';
 import { SectionHeading } from '@/components/ui/SectionHeading';
-import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
-import { MessageCircle, Send, ArrowLeft, Package, Activity, User as UserIcon, Trash2, ExternalLink } from 'lucide-react';
+import { MessageCircle, Send, ArrowLeft, Package, Activity, User as UserIcon, Trash2, ExternalLink, ShoppingBag, PenTool } from 'lucide-react';
 import { useSession } from 'next-auth/react';
-import { useSearchParams } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { cn } from '@/lib/utils';
 
-interface Chat {
+type ConversationSource = 'chat' | 'consultation';
+
+interface Conversation {
   id: string;
+  source: ConversationSource;
   participants: string[];
   participantNames: Record<string, string>;
   productRef?: { id: string; name: string; price: number; imageUrl?: string };
@@ -25,6 +28,14 @@ interface Chat {
   lastMessageAt?: string;
   hasUnread?: boolean;
   type: string;
+  /** Consultation-only metadata, present when source==='consultation'. */
+  consultation?: {
+    expertName: string;
+    expertTitle: string;
+    expertPrice: string;
+    slot: string;
+    status: string;
+  };
 }
 
 interface Message {
@@ -36,40 +47,66 @@ interface Message {
   createdAt: string;
 }
 
+type TabKey = 'orders' | 'consultations';
+
 function ChatPageInner() {
   const { data: session } = useSession();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const chatIdParam = searchParams.get('id');
-  const [chats, setChats] = useState<Chat[]>([]);
+  const tabParam = searchParams.get('tab');
+  const sourceParam = searchParams.get('source') as ConversationSource | null;
+
+  const [activeTab, setActiveTab] = useState<TabKey>(
+    tabParam === 'consultations' ? 'consultations' : 'orders'
+  );
+  const [chats, setChats] = useState<Conversation[]>([]);
+  const [consultations, setConsultations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
+  const [selected, setSelected] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; chatId: string | null }>({ open: false, chatId: null });
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const userEmail = session?.user?.email || '';
 
+  const visibleList = activeTab === 'consultations' ? consultations : chats;
+
   useEffect(() => {
-    fetchChats();
+    fetchAll();
+    // Sync nav badge whenever we load this page.
+    window.dispatchEvent(new Event('chats:refresh-unread'));
   }, []);
 
-  // Auto-open chat when ?id= param is present
+  // Auto-open conversation when ?id= param is present
   useEffect(() => {
-    if (chatIdParam && chats.length > 0 && !selectedChat) {
-      const target = chats.find(c => c.id === chatIdParam);
-      if (target) openChat(target);
+    if (!chatIdParam || (chats.length === 0 && consultations.length === 0) || selected) return;
+    // If source is explicit, only search that pool; otherwise search both.
+    const pool =
+      sourceParam === 'consultation'
+        ? consultations
+        : sourceParam === 'chat'
+          ? chats
+          : [...consultations, ...chats];
+    const target = pool.find(c => c.id === chatIdParam);
+    if (target) {
+      // Switch to the appropriate tab so the user sees the highlighted row.
+      setActiveTab(target.source === 'consultation' ? 'consultations' : 'orders');
+      openConversation(target);
     }
-  }, [chatIdParam, chats]);
+  }, [chatIdParam, sourceParam, chats, consultations]);
 
-  // Poll for new messages every 5 seconds when a chat is open
+  // Poll for new messages every 5 seconds when a conversation is open
   useEffect(() => {
-    if (!selectedChat) return;
+    if (!selected) return;
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/chats/${selectedChat.id}`);
+        const url = selected.source === 'consultation'
+          ? `/api/consultations/${selected.id}/messages`
+          : `/api/chats/${selected.id}`;
+        const res = await fetch(url);
         if (res.ok) {
           const msgs = await res.json();
           setMessages(prev => {
@@ -87,25 +124,74 @@ function ChatPageInner() {
       } catch {}
     }, 5000);
     return () => clearInterval(interval);
-  }, [selectedChat]);
+  }, [selected]);
 
-  const fetchChats = async () => {
+  const fetchAll = async () => {
+    setLoading(true);
     try {
-      const res = await fetch('/api/chats');
-      if (res.ok) setChats(await res.json());
+      const [chatRes, consultRes] = await Promise.all([
+        fetch('/api/chats'),
+        fetch('/api/consultations'),
+      ]);
+      if (chatRes.ok) {
+        const data = (await chatRes.json()) as Conversation[];
+        setChats((data || []).map((c) => ({ ...c, source: 'chat' as const })));
+      }
+      if (consultRes.ok) {
+        type ConsultationApi = {
+          id: string;
+          clientEmail: string;
+          clientName?: string;
+          lastMessage?: string;
+          lastMessageAt?: string;
+          hasUnread?: boolean;
+          expertName?: string;
+          expertTitle?: string;
+          expertPrice?: string;
+          slot?: string;
+          status?: string;
+        };
+        const data = (await consultRes.json()) as ConsultationApi[];
+        setConsultations(
+          (data || []).map((c) => ({
+            id: c.id,
+            source: 'consultation' as const,
+            participants: [c.clientEmail],
+            participantNames: { [c.clientEmail]: c.clientName || c.clientEmail },
+            lastMessage: c.lastMessage,
+            lastMessageAt: c.lastMessageAt,
+            hasUnread: !!c.hasUnread,
+            type: 'consultation',
+            consultation: {
+              expertName: c.expertName || 'Pending Assignment',
+              expertTitle: c.expertTitle || '',
+              expertPrice: c.expertPrice || 'TBD',
+              slot: c.slot || 'TBD',
+              status: c.status || 'pending',
+            },
+          }))
+        );
+      }
     } catch (e) {
-      console.error('Failed to fetch chats', e);
+      console.error('Failed to fetch conversations', e);
     } finally {
       setLoading(false);
     }
   };
 
-  const openChat = async (chat: Chat) => {
-    setSelectedChat(chat);
-    setChats(prev => prev.map(c => c.id === chat.id ? { ...c, hasUnread: false } : c));
+  const openConversation = async (convo: Conversation) => {
+    setSelected(convo);
+    if (convo.source === 'consultation') {
+      setConsultations(prev => prev.map(c => c.id === convo.id ? { ...c, hasUnread: false } : c));
+    } else {
+      setChats(prev => prev.map(c => c.id === convo.id ? { ...c, hasUnread: false } : c));
+    }
     setLoadingMessages(true);
     try {
-      const res = await fetch(`/api/chats/${chat.id}`);
+      const url = convo.source === 'consultation'
+        ? `/api/consultations/${convo.id}/messages`
+        : `/api/chats/${convo.id}`;
+      const res = await fetch(url);
       if (res.ok) {
         const msgs = await res.json();
         setMessages(msgs);
@@ -115,6 +201,8 @@ function ChatPageInner() {
           }
         }, 100);
       }
+      // Nudge the navbar to reflect the just-cleared unread state.
+      window.dispatchEvent(new Event('chats:refresh-unread'));
     } catch (e) {
       console.error('Failed to fetch messages', e);
     } finally {
@@ -123,10 +211,13 @@ function ChatPageInner() {
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedChat) return;
+    if (!newMessage.trim() || !selected) return;
     setSending(true);
     try {
-      const res = await fetch(`/api/chats/${selectedChat.id}`, {
+      const url = selected.source === 'consultation'
+        ? `/api/consultations/${selected.id}/messages`
+        : `/api/chats/${selected.id}`;
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: newMessage.trim() }),
@@ -140,6 +231,7 @@ function ChatPageInner() {
             messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
           }
         }, 100);
+        window.dispatchEvent(new Event('chats:refresh-unread'));
       }
     } catch (e) {
       console.error('Failed to send message', e);
@@ -149,12 +241,13 @@ function ChatPageInner() {
   };
 
   const handleDeleteChat = async (chatId: string) => {
+    // Only chats (not consultations) are soft-deletable from this UI.
     try {
       const res = await fetch(`/api/chats/${chatId}`, { method: 'DELETE' });
       if (res.ok) {
         setChats(prev => prev.filter(c => c.id !== chatId));
-        if (selectedChat?.id === chatId) {
-          setSelectedChat(null);
+        if (selected?.id === chatId) {
+          setSelected(null);
           setMessages([]);
         }
         setDeleteConfirm({ open: false, chatId: null });
@@ -164,22 +257,34 @@ function ChatPageInner() {
     }
   };
 
-  const getOtherName = (chat: Chat) => {
-    const other = chat.participants.find(p => p !== userEmail);
-    return other ? (chat.participantNames[other] || other) : 'Unknown';
+  const handleTabChange = (tab: TabKey) => {
+    setActiveTab(tab);
+    setSelected(null);
+    setMessages([]);
+    // Reflect the tab in the URL without a full navigation so refreshes land
+    // back where the user was.
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', tab);
+    params.delete('id');
+    params.delete('source');
+    router.replace(`/chat?${params.toString()}`);
   };
 
-  // Check if a message content is a product inquiry (starts with "Hi! I'm interested")
-  const isProductInquiry = (content: string) => {
-    return content.startsWith("Hi! I'm interested in this product:");
+  const getOtherName = (convo: Conversation) => {
+    if (convo.source === 'consultation') {
+      return convo.consultation?.expertName || 'Pending Assignment';
+    }
+    const other = convo.participants.find(p => p !== userEmail);
+    return other ? (convo.participantNames[other] || other) : 'Unknown';
   };
 
-  // Render product inquiry as a styled card
-  const renderProductCard = (msg: Message, chat: Chat | null, isMe: boolean) => {
-    const productRef = chat?.productRef;
+  const isProductInquiry = (content: string) =>
+    content.startsWith("Hi! I'm interested in this product:");
+
+  const renderProductCard = (msg: Message, convo: Conversation | null, isMe: boolean) => {
+    const productRef = convo?.productRef;
     return (
       <div className={`max-w-[80%] rounded-sm overflow-hidden ${isMe ? 'bg-safety-orange' : 'bg-[var(--bg-surface)] border border-[var(--border-primary)]'}`}>
-        {/* Product preview header */}
         {productRef && (
           <div className={`flex items-center gap-3 p-3 ${isMe ? 'bg-black/10' : 'bg-[var(--bg-surface-elevated)]'} border-b ${isMe ? 'border-white/10' : 'border-[var(--border-secondary)]'}`}>
             {productRef.imageUrl ? (
@@ -198,7 +303,6 @@ function ChatPageInner() {
             </Link>
           </div>
         )}
-        {/* Message body */}
         <div className="px-4 py-3">
           <p className={`text-sm ${isMe ? 'text-white' : 'text-[var(--text-primary)]'}`}>
             Hi! I&apos;m interested in this product. Could you help me with more details?
@@ -211,66 +315,99 @@ function ChatPageInner() {
     );
   };
 
+  const tabCounts = useMemo(() => ({
+    orders: chats.filter(c => c.hasUnread).length,
+    consultations: consultations.filter(c => c.hasUnread).length,
+  }), [chats, consultations]);
+
   return (
     <PageShell>
       <div className="container mx-auto px-4 pt-16 sm:pt-20 pb-4 flex flex-col h-[calc(100vh-64px)]">
         <SectionHeading title="Messages" annotation="Chat & Support" dark={true} />
 
+        {/* Tabs: Orders vs Consultations */}
+        <div className="flex gap-2 mb-4 border-b border-[var(--border-primary)]">
+          <TabButton
+            active={activeTab === 'orders'}
+            onClick={() => handleTabChange('orders')}
+            icon={ShoppingBag}
+            label="Orders"
+            count={chats.length}
+            unread={tabCounts.orders}
+          />
+          <TabButton
+            active={activeTab === 'consultations'}
+            onClick={() => handleTabChange('consultations')}
+            icon={PenTool}
+            label="Consultations"
+            count={consultations.length}
+            unread={tabCounts.consultations}
+          />
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
-          {/* Chat List — scrollable, contained */}
-          <div className={`flex flex-col h-full overflow-hidden border border-[var(--border-primary)] rounded-sm bg-[var(--bg-secondary)] ${selectedChat ? 'hidden lg:flex' : ''}`}>
+          {/* Conversation List */}
+          <div className={`flex flex-col h-full overflow-hidden border border-[var(--border-primary)] rounded-sm bg-[var(--bg-secondary)] ${selected ? 'hidden lg:flex' : ''}`}>
             <div className="p-3 border-b border-[var(--border-primary)] bg-[var(--bg-surface)]">
               <h4 className="text-xs font-black text-[var(--text-muted)] uppercase tracking-widest">
-                Conversations ({chats.length})
+                {activeTab === 'consultations' ? 'Expert Conversations' : 'Conversations'} ({visibleList.length})
               </h4>
             </div>
             <div className="flex-grow overflow-y-auto">
               {loading ? (
                 <div className="py-20 flex justify-center"><Activity className="w-8 h-8 text-safety-orange animate-spin" /></div>
-              ) : chats.length > 0 ? (
+              ) : visibleList.length > 0 ? (
                 <div className="divide-y divide-[var(--border-secondary)]">
-                  {chats.map(chat => (
+                  {visibleList.map(convo => (
                     <div
-                      key={chat.id}
+                      key={`${convo.source}-${convo.id}`}
                       className={`relative group cursor-pointer transition-all ${
-                        selectedChat?.id === chat.id
+                        selected?.id === convo.id && selected?.source === convo.source
                           ? 'bg-safety-orange/10 border-l-2 border-l-safety-orange'
                           : 'hover:bg-[var(--bg-surface)] border-l-2 border-l-transparent'
                       }`}
                     >
-                      <div className="p-3" onClick={() => openChat(chat)}>
+                      <div className="p-3" onClick={() => openConversation(convo)}>
                         <div className="flex items-center gap-3 mb-1">
                           <div className="w-9 h-9 rounded-full bg-safety-orange/20 flex items-center justify-center shrink-0">
                             <UserIcon className="w-4 h-4 text-safety-orange" />
                           </div>
                           <div className="flex-grow min-w-0">
-                            <h4 className={`text-sm font-bold text-[var(--text-primary)] truncate ${chat.hasUnread ? 'font-black' : ''}`}>{getOtherName(chat)}</h4>
-                            <p className={`text-[10px] truncate ${chat.hasUnread ? 'text-[var(--text-primary)] font-bold' : 'text-[var(--text-muted)]'}`}>{chat.lastMessage || 'No messages yet'}</p>
+                            <h4 className={`text-sm font-bold text-[var(--text-primary)] truncate ${convo.hasUnread ? 'font-black' : ''}`}>{getOtherName(convo)}</h4>
+                            <p className={`text-[10px] truncate ${convo.hasUnread ? 'text-[var(--text-primary)] font-bold' : 'text-[var(--text-muted)]'}`}>{convo.lastMessage || (convo.source === 'consultation' ? convo.consultation?.expertTitle : 'No messages yet')}</p>
                           </div>
-                          {chat.hasUnread && (
+                          {convo.hasUnread && (
                             <span className="w-2.5 h-2.5 bg-safety-orange rounded-full shrink-0 animate-pulse" />
                           )}
                           <div className="flex flex-col items-end gap-1 shrink-0">
-                            <Badge variant={chat.type === 'product' ? 'new' : chat.type === 'consultation' ? 'in-progress' : 'pending'} className="text-[7px]">
-                              {chat.type}
+                            <Badge variant={convo.type === 'product' ? 'new' : convo.type === 'consultation' ? 'in-progress' : 'pending'} className="text-[7px]">
+                              {convo.type}
                             </Badge>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ open: true, chatId: chat.id }); }}
-                              className="p-1 rounded-sm text-[var(--text-muted)] hover:text-red-500 hover:bg-red-500/10 transition-all"
-                              title="Delete chat"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {convo.source === 'chat' && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ open: true, chatId: convo.id }); }}
+                                className="p-1 rounded-sm text-[var(--text-muted)] hover:text-red-500 hover:bg-red-500/10 transition-all"
+                                title="Delete chat"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
-                        {chat.productRef && (
+                        {convo.productRef && (
                           <div className="ml-12 flex items-center gap-2 mt-1 px-2 py-1 bg-[var(--bg-surface-elevated)] rounded-sm border border-[var(--border-secondary)]">
-                            {chat.productRef.imageUrl ? (
-                              <img src={chat.productRef.imageUrl} alt="" className="w-4 h-4 rounded-sm object-cover" />
+                            {convo.productRef.imageUrl ? (
+                              <img src={convo.productRef.imageUrl} alt="" className="w-4 h-4 rounded-sm object-cover" />
                             ) : (
                               <Package className="w-3 h-3 text-safety-orange shrink-0" />
                             )}
-                            <span className="text-[9px] font-bold text-[var(--text-secondary)] truncate">{chat.productRef.name}</span>
+                            <span className="text-[9px] font-bold text-[var(--text-secondary)] truncate">{convo.productRef.name}</span>
+                          </div>
+                        )}
+                        {convo.source === 'consultation' && convo.consultation && (
+                          <div className="ml-12 flex items-center gap-2 mt-1 px-2 py-1 bg-[var(--bg-surface-elevated)] rounded-sm border border-[var(--border-secondary)]">
+                            <PenTool className="w-3 h-3 text-safety-orange shrink-0" />
+                            <span className="text-[9px] font-bold text-[var(--text-secondary)] truncate">{convo.consultation.expertTitle || 'Consultation'}</span>
                           </div>
                         )}
                       </div>
@@ -281,44 +418,62 @@ function ChatPageInner() {
                 <div className="py-20 flex flex-col items-center text-center px-4">
                   <MessageCircle className="w-12 h-12 text-[var(--text-muted)] mb-4" />
                   <h4 className="text-lg font-black text-[var(--text-primary)] uppercase mb-2">No Conversations</h4>
-                  <p className="text-xs text-[var(--text-muted)]">Start a chat from a product page or consultation.</p>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {activeTab === 'consultations'
+                      ? 'Book a consultation to chat with an expert.'
+                      : 'Start a chat from a product page or pickup point.'}
+                  </p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Chat Window */}
+          {/* Conversation Window */}
           <div className="lg:col-span-2 h-full overflow-hidden">
-            {selectedChat ? (
+            {selected ? (
               <div className="flex flex-col h-full border border-[var(--border-primary)] rounded-sm overflow-hidden bg-[var(--bg-secondary)]">
-                {/* Chat Header */}
                 <div className="p-4 border-b border-[var(--border-primary)] bg-[var(--bg-surface)] flex items-center gap-3 shrink-0">
-                  <button onClick={() => setSelectedChat(null)} className="lg:hidden text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                  <button onClick={() => setSelected(null)} className="lg:hidden text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
                     <ArrowLeft className="w-5 h-5" />
                   </button>
                   <div className="w-10 h-10 rounded-full bg-safety-orange/20 flex items-center justify-center">
                     <UserIcon className="w-5 h-5 text-safety-orange" />
                   </div>
-                  <div className="flex-grow">
-                    <h4 className="font-bold text-[var(--text-primary)] text-sm">{getOtherName(selectedChat)}</h4>
-                    <p className="text-[10px] text-[var(--text-muted)] uppercase font-bold tracking-widest">{selectedChat.type} chat</p>
+                  <div className="flex-grow min-w-0">
+                    <h4 className="font-bold text-[var(--text-primary)] text-sm truncate">{getOtherName(selected)}</h4>
+                    <p className="text-[10px] text-[var(--text-muted)] uppercase font-bold tracking-widest truncate">
+                      {selected.source === 'consultation'
+                        ? `${selected.consultation?.expertTitle || ''} · ${selected.consultation?.slot || ''}`
+                        : `${selected.type} chat`}
+                    </p>
                   </div>
-                  {selectedChat.productRef && (
+                  {selected.productRef && (
                     <Link
-                      href={`/shop/${selectedChat.productRef.id}`}
+                      href={`/shop/${selected.productRef.id}`}
                       className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-safety-orange/10 rounded-sm border border-safety-orange/20 hover:bg-safety-orange/20 transition-colors"
                     >
-                      {selectedChat.productRef.imageUrl ? (
-                        <img src={selectedChat.productRef.imageUrl} alt="" className="w-5 h-5 rounded-sm object-cover" />
+                      {selected.productRef.imageUrl ? (
+                        <img src={selected.productRef.imageUrl} alt="" className="w-5 h-5 rounded-sm object-cover" />
                       ) : (
                         <Package className="w-3 h-3 text-safety-orange" />
                       )}
-                      <span className="text-[10px] font-bold text-safety-orange">{selectedChat.productRef.name}</span>
+                      <span className="text-[10px] font-bold text-safety-orange">{selected.productRef.name}</span>
                     </Link>
+                  )}
+                  {selected.source === 'consultation' && selected.consultation && (
+                    <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-safety-orange/10 rounded-sm border border-safety-orange/20">
+                      <Badge variant={
+                        selected.consultation.status === 'completed' ? 'completed'
+                        : selected.consultation.status === 'confirmed' ? 'confirmed'
+                        : selected.consultation.status === 'cancelled' ? 'cancelled'
+                        : 'pending'
+                      } className="text-[8px]">
+                        {selected.consultation.status.toUpperCase()}
+                      </Badge>
+                    </div>
                   )}
                 </div>
 
-                {/* Messages */}
                 <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
                   {loadingMessages ? (
                     <div className="py-10 flex justify-center"><Activity className="w-6 h-6 text-safety-orange animate-spin" /></div>
@@ -334,7 +489,7 @@ function ChatPageInner() {
                           className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
                         >
                           {isInquiry ? (
-                            renderProductCard(msg, selectedChat, isMe)
+                            renderProductCard(msg, selected, isMe)
                           ) : (
                             <div className={`max-w-[75%] px-4 py-3 rounded-sm ${
                               isMe
@@ -355,10 +510,8 @@ function ChatPageInner() {
                       <p className="text-[var(--text-muted)] text-sm">No messages yet. Say hello!</p>
                     </div>
                   )}
-                  <div ref={messagesEndRef} />
                 </div>
 
-                {/* Message Input */}
                 <div className="p-3 border-t border-[var(--border-primary)] bg-[var(--bg-surface)] shrink-0">
                   <div className="flex gap-2">
                     <Input
@@ -403,6 +556,42 @@ function ChatPageInner() {
     </PageShell>
   );
 }
+
+const TabButton = ({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+  count,
+  unread,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  count: number;
+  unread: number;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={cn(
+      'relative flex items-center gap-2 px-4 py-2.5 text-xs font-black uppercase tracking-widest transition-all border-b-2 -mb-px',
+      active
+        ? 'border-safety-orange text-safety-orange'
+        : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+    )}
+  >
+    <Icon className="w-4 h-4" />
+    {label}
+    <span className="text-[10px] opacity-60">({count})</span>
+    {unread > 0 && (
+      <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-safety-orange text-white text-[9px] font-black">
+        {unread > 9 ? '9+' : unread}
+      </span>
+    )}
+  </button>
+);
 
 export default function ChatPage() {
   return (

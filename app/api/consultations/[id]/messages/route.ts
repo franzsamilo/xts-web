@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getConsultationMessages, addConsultationMessage, getConsultationById } from '@/lib/consultations';
+import { getConsultationMessages, addConsultationMessage, getConsultationById, markConsultationAsRead } from '@/lib/consultations';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
@@ -27,6 +27,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const messages = await getConsultationMessages(id);
+    try {
+      await markConsultationAsRead(id, session.user.email);
+    } catch {}
     return NextResponse.json(messages);
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });
